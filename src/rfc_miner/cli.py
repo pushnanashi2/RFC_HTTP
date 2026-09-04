@@ -186,7 +186,7 @@ def main(argv: list[str] | None = None) -> int:
             profile=args.profile,
             seed=args.seed,
         )
-        print(f"cancellation sample: {output}; records: {count}")
+        print(f"cancellation sample: {output}; rows: {count}")
         return 0
 
     if args.command == "run":

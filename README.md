@@ -123,7 +123,7 @@ seed is written.
 - `data/results/report.md` — human-readable stage report with raw and deduplicated evidence counts
 - `data/results/candidates/http-cancellation.md` — cancellation candidate report, including route-level operation linkage
 - `data/results/manual-review.md` — TP/FP/FN validation checklist
-- `data/results/validation/http-cancellation-sample.csv` — stratified cancellation labeling sheet
+- `data/results/validation/http-cancellation-sample.csv` — stratified family-pattern cancellation labeling sheet
 
 ## Reading the scores
 
@@ -146,6 +146,11 @@ For `http-cancellation`, strict score is not enough by itself because business
 routes such as `POST /subscriptions/{id}/cancel` can match the same shape as
 operation cancellation. Use the route-level operation-linkage metrics and the
 sampling protocol before making Internet-Draft prevalence claims.
+
+The cancellation sample sheet uses one family-pattern representative per row.
+Do not publish a raw pooled TP rate from the sheet: report per-pattern rates and
+a strict pattern-family weighted estimate, with `delete-operation-resource`
+handled as a separate promotion audit.
 
 Generate the cancellation sample sheet with:
 

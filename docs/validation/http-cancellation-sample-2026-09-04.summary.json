@@ -1,9 +1,15 @@
 {
+  "byEstimationPopulation": {
+    "delete-operation-resource-audit": 50,
+    "strict-cancellation": 210
+  },
   "byLinkageBucket": {
-    "domain-transition-risk": 90,
-    "operation-like-target": 59,
-    "other": 11,
-    "same-resource-linked": 100
+    "domain-transition-risk": 80,
+    "mixed-operation-target-and-risk": 14,
+    "mixed-same-resource-and-risk": 34,
+    "operation-like-target": 33,
+    "other": 7,
+    "same-resource-linked": 92
   },
   "byPattern": {
     "delete-action-cancel": 30,
@@ -14,5 +20,22 @@
     "post-subresource-cancel": 80,
     "put-action-cancel": 27
   },
-  "sampleCount": 260
+  "estimationGuidance": {
+    "ambiguous": "Report ambiguous-as-false-positive and ambiguous-as-true-positive bounds, plus an explicit non-ambiguous rate.",
+    "confidenceIntervals": "Use Wilson or Clopper-Pearson intervals for sampled strata. Mark full-census strata separately rather than applying a sampling-error interval.",
+    "deleteOperationResource": "Report separately as an audit stratum for possible strict-rule promotion; do not mix it into strict-cancellation estimates.",
+    "doNotPoolRawRows": true,
+    "strictCancellation": "Compute per-pattern rates and a pattern-family weighted estimate using populationFamilyMemberships. This estimates pattern-family membership precision, not unique-family prevalence over 407 families."
+  },
+  "populationFamilyMembershipsByPattern": {
+    "delete-action-cancel": 31,
+    "delete-operation-resource": 209,
+    "get-cancel-link": 18,
+    "patch-state-cancelled": 5,
+    "post-action-cancel": 106,
+    "post-subresource-cancel": 330,
+    "put-action-cancel": 27
+  },
+  "sampleCount": 260,
+  "samplingUnit": "family-pattern-representative"
 }

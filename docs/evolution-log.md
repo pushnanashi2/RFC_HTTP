@@ -179,5 +179,15 @@ This log records why extraction and analysis logic changes over time.
 - root cause: Route-level linkage existed only as aggregate report data and was not reusable as per-record sampling metadata.
 - change: Added a deterministic `sample-cancellation` command that emits a CSV label sheet and summary JSON from normalized evidence and family data.
 - expected effect: Reviewers can label the same sample sheet and compute TP rates without redoing corpus extraction.
-- actual effect: The 5,000-repository run produced a 260-record unlabeled sample with all protocol strata filled: 80 `post-subresource-cancel`, 50 `post-action-cancel`, 30 `delete-action-cancel`, 27 `put-action-cancel`, 18 `get-cancel-link`, 5 `patch-state-cancelled`, and 50 `delete-operation-resource`.
+- actual effect: The 5,000-repository run produced a 260-row unlabeled family-pattern representative sample with all protocol strata filled: 80 `post-subresource-cancel`, 50 `post-action-cancel`, 30 `delete-action-cancel`, 27 `put-action-cancel`, 18 `get-cancel-link`, 5 `patch-state-cancelled`, and 50 `delete-operation-resource`.
 - regression added: Tests verify sample-sheet generation preserves same-resource-linked and domain-transition-risk buckets with blank labels.
+
+## 2026-09-04 — Cancellation sample estimator hardening
+
+- problem: The generated sample sheet could be misused as a raw record-level pool even though sample fractions differ sharply by pattern.
+- observed failure: A family-pattern with multiple cancellation routes could appear more than once, and `delete-operation-resource` could be accidentally mixed into the strict TP estimate.
+- root cause: The sheet did not make the sampling unit, estimation population, weighting, or ambiguous-label handling explicit enough for external review.
+- change: Sample generation now emits one representative per `family_id` × `pattern`, adds population counts, sampling fractions, analysis weights, and separates strict cancellation from `delete-operation-resource` promotion audit rows.
+- expected effect: Labeling produces per-pattern rates and a strict pattern-family weighted estimate rather than an invalid pooled TP rate.
+- actual effect: The protocol now requires ambiguity bounds, Wilson or Clopper-Pearson intervals, census-stratum handling, two blind reviewers, agreement reporting, and adjudication before drafting.
+- regression added: Tests verify sample rows are unique by `family_id` × `pattern` and carry estimator metadata.

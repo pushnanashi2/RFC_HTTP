@@ -499,6 +499,21 @@ class PipelineTests(unittest.TestCase):
                         "extractor": "openapi",
                     },
                     {
+                        "repository": "example/ops",
+                        "commit": "abc123",
+                        "concept": "http-cancellation",
+                        "evidenceType": "route",
+                        "httpMethod": "POST",
+                        "path": "/subscriptions/{id}/cancel",
+                        "responseCodes": [200],
+                        "file": "openapi.yaml",
+                        "lineStart": 3,
+                        "lineEnd": 3,
+                        "confidence": 0.78,
+                        "extractedValue": {},
+                        "extractor": "openapi",
+                    },
+                    {
                         "repository": "example/domain",
                         "commit": "def456",
                         "concept": "http-cancellation",
@@ -523,15 +538,22 @@ class PipelineTests(unittest.TestCase):
                 rows = list(csv.DictReader(handle))
 
             self.assertEqual(count, 2)
+            self.assertEqual(len({(row["family_id"], row["pattern"]) for row in rows}), len(rows))
             self.assertEqual({row["primaryLabel"] for row in rows}, {""})
+            self.assertEqual({row["samplingUnit"] for row in rows}, {"family-pattern-representative"})
+            self.assertEqual({row["estimationPopulation"] for row in rows}, {"strict-cancellation"})
+            self.assertEqual({row["populationFamilyMemberships"] for row in rows}, {"2"})
+            self.assertTrue(all(row["familyPatternCancellationEvidence"] for row in rows))
             self.assertEqual(
                 {row["linkageBucket"] for row in rows},
-                {"same-resource-linked", "domain-transition-risk"},
+                {"mixed-same-resource-and-risk", "domain-transition-risk"},
             )
             domain_row = next(row for row in rows if row["repository"] == "example/domain")
             self.assertEqual(domain_row["cancelTargetPath"], "/subscriptions/{var}")
             self.assertEqual(domain_row["domainTransitionRisk"], "true")
-            self.assertTrue(output.with_suffix(".summary.json").exists())
+            summary = json.loads(output.with_suffix(".summary.json").read_text(encoding="utf-8"))
+            self.assertTrue(summary["estimationGuidance"]["doNotPoolRawRows"])
+            self.assertEqual(summary["samplingUnit"], "family-pattern-representative")
 
     def test_collect_records_clone_errors_and_continues(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
