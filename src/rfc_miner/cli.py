@@ -12,7 +12,7 @@ from .github_discovery import discover_github_repositories
 from .normalization import normalize_evidence
 from .paths import data_paths
 from .reporting import write_report
-from .sampling import write_cancellation_sample
+from .sampling import write_cancellation_family_sample, write_cancellation_sample
 from .scoring import score_opportunities
 from .standards import compare_standards
 from .streaming import collect_and_analyze_streaming
@@ -78,6 +78,15 @@ def build_parser() -> argparse.ArgumentParser:
     cancellation_sample.add_argument("--output")
     cancellation_sample.add_argument("--profile", choices=["full", "minimum"], default="full")
     cancellation_sample.add_argument("--seed", type=int, default=20260904)
+
+    cancellation_family_sample = subcommands.add_parser(
+        "sample-cancellation-family",
+        help="write a strict-family HTTP cancellation validation sample sheet",
+    )
+    add_common(cancellation_family_sample)
+    cancellation_family_sample.add_argument("--output")
+    cancellation_family_sample.add_argument("--profile", choices=["full", "minimum"], default="full")
+    cancellation_family_sample.add_argument("--seed", type=int, default=20260904)
 
     run = subcommands.add_parser("run", help="run the full pipeline")
     add_common(run)
@@ -187,6 +196,16 @@ def main(argv: list[str] | None = None) -> int:
             seed=args.seed,
         )
         print(f"cancellation sample: {output}; rows: {count}")
+        return 0
+
+    if args.command == "sample-cancellation-family":
+        output, count = write_cancellation_family_sample(
+            paths=paths,
+            output_path=args.output,
+            profile=args.profile,
+            seed=args.seed,
+        )
+        print(f"cancellation family sample: {output}; rows: {count}")
         return 0
 
     if args.command == "run":

@@ -38,15 +38,21 @@ Current generated snapshot:
 
 - `docs/validation/http-cancellation-sample-2026-09-04.csv`
 - `docs/validation/http-cancellation-sample-2026-09-04.summary.json`
+- `docs/validation/http-cancellation-family-sample-2026-09-04.csv`
+- `docs/validation/http-cancellation-family-sample-2026-09-04.summary.json`
 
 Sampling unit:
 
-- one `family_id` × `pattern` membership, represented by the highest-quality
-  evidence record for that membership.
-- the sheet must not contain two rows with the same `family_id` and `pattern`.
-- this estimates pattern-family membership precision. It does not estimate
-  route-record precision or unique-family prevalence over the 407 strict
-  cancellation families.
+- primary pattern sheet: one `family_id` × `pattern` membership, represented by
+  the highest-quality evidence record for that membership.
+- family denominator sheet: one strict cancellation `family_id`, represented by
+  the highest-quality strict cancellation evidence record for that family.
+- the primary sheet must not contain two rows with the same `family_id` and
+  `pattern`; the family sheet must not contain two rows with the same
+  `family_id`.
+- the primary sheet estimates pattern-family membership precision. It does not
+  estimate route-record precision or unique-family prevalence over the 407
+  strict cancellation families.
 
 Primary population:
 
@@ -68,7 +74,10 @@ Secondary audit population:
 
 ## Current Strata
 
-Rows are non-exclusive pattern-family memberships and must not be summed.
+Rows are non-exclusive pattern-family memberships. Do not compare the sum of
+membership rows to the 407 unique strict cancellation families. The membership
+sum is valid only as the sampling-frame size for the primary pattern-family
+sheet.
 Sampling fractions intentionally vary by stratum, so a raw pooled TP rate from
 the 260 rows is invalid.
 
@@ -91,7 +100,7 @@ For `delete-operation-resource`, use the 185/209 same-resource linkage as the
 reason to sample the bucket. Do not treat 202/209 operation-like target or zero
 domain-transition risk as independent evidence of precision.
 
-If reviewer time is constrained, use a 140-row minimum sample:
+If reviewer time is constrained, use a 140-row minimum pattern-family sample:
 
 | Pattern | Minimum sample |
 | --- | ---: |
@@ -102,6 +111,44 @@ If reviewer time is constrained, use a 140-row minimum sample:
 | `get-cancel-link` | 10 |
 | `patch-state-cancelled` | 5 |
 | `delete-operation-resource` | 10 |
+
+## Unique-Family Denominator Sample
+
+The pattern-family sheet must not be used to update the 407-family denominator,
+because a family with multiple strict patterns has multiple chances to be
+sampled and may be more likely to be a true operation-cancellation API.
+
+Generate a separate unique-family sheet before making claims over the 407 strict
+cancellation families:
+
+```bash
+rfc-miner sample-cancellation-family \
+  --data-dir /mnt/cash-data/rfc-http-miner/data-5000-refined \
+  --profile full
+```
+
+Current generated snapshot:
+
+| Sheet | Population | Sample | Sampling fraction | Use |
+| --- | ---: | ---: | ---: | --- |
+| `docs/validation/http-cancellation-family-sample-2026-09-04.csv` | 407 strict families | 140 families | 34.4% | update unique-family claims |
+
+Use this sheet, not the pattern-family sheet, when updating the 407 / 194 / 215
+family-level claims. The family-level primary label means: this family exposes
+at least one true operation-cancellation affordance among its strict cancellation
+evidence.
+
+The pattern-family sheet includes an exploratory
+`strictFamilyApproxInclusionProbability` column using:
+
+```text
+pi_family ≈ 1 - product(1 - f_pattern)
+```
+
+where `f_pattern` is the observed sampling fraction for each strict pattern
+present in that family. Treat this only as a sensitivity check: bucket quotas and
+repository caps make the exact design probability more complex than the simple
+formula.
 
 ## Secondary Repository Stratification
 
@@ -120,6 +167,10 @@ Rules:
 
 For generated catalog audits, run a separate concentration sample rather than
 relaxing these caps.
+
+The current pattern-family representative design satisfies the anti-domination
+requirement for each pattern stratum: a single repository/family can contribute
+at most one row to a given pattern before repository caps are applied.
 
 ## Linkage Sub-Strata
 
@@ -206,11 +257,31 @@ Required columns:
 - `reviewer`
 - `adjudicatedLabel`
 
-The primary label applies to the representative row. It is not a claim that
-every cancellation route in the same family-pattern membership has the same
-semantics. For mixed buckets, inspect `familyPatternCancellationEvidence` and use
-the `mixed_family_pattern` secondary flag when both operation and domain
-cancellation are present.
+The strict-family sheet uses the same route/context label columns, but replaces
+pattern-frame fields with:
+
+- `populationStrictFamilies`
+- `strictFamilySampleSize`
+- `strictFamilySamplingFraction`
+- `strictFamilyAnalysisWeight`
+- `strictFamilyPatternMemberships`
+- `strictFamilyHasSameResourceLinked`
+- `strictFamilyHasOperationTarget`
+- `strictFamilyHasDomainTransitionRisk`
+- `strictFamilyCancellationEvidence`
+
+For the pattern-family sheet, the primary label applies to the representative
+row. It is not a claim that every cancellation route in the same family-pattern
+membership has the same semantics. For mixed buckets, inspect
+`familyPatternCancellationEvidence` and use the `mixed_family_pattern` secondary
+flag when both operation and domain cancellation are present. If within-family
+mixing prevalence matters, run a follow-up all-routes audit on mixed buckets; the
+representative-row sheet is not designed to estimate that prevalence.
+
+For the strict-family sheet, the primary label applies to the family: label
+`operation-cancellation` if any strict cancellation evidence in the family is a
+true operation-cancellation affordance. Inspect `strictFamilyCancellationEvidence`
+before labeling.
 
 Recommended `reviewerConfidence` values:
 
@@ -251,10 +322,12 @@ For each pattern stratum, compute these three ambiguity-safe rates:
   `n - ambiguous > 0`;
 - `ambiguous_as_tp_rate`: `(tp + ambiguous) / n`.
 
-Report Wilson or Clopper-Pearson 95% confidence intervals. Do not use Wald
-intervals for small strata such as `n=5`, `n=18`, or `n=27`. When a stratum is a
-full census (`n == N`), mark it as census and do not present a sampling-error
-interval as if it were sampled.
+Report Wilson or Clopper-Pearson 95% confidence intervals for sampled strata. Do
+not use Wald intervals for small strata such as `n=5`, `n=18`, or `n=27`. When a
+stratum is a full census (`n == N`), mark it as census and do not present a
+sampling-error interval as if it were sampled. For near-census strata such as
+`delete-action-cancel` (`30/31`), apply a finite-population correction when
+estimating sampling variance.
 
 Wilson interval:
 
@@ -274,8 +347,19 @@ weighted_rate = sum(N_pattern * rate_pattern) / sum(N_pattern)
 Compute the weighted estimate separately for `ambiguous_as_fp_rate`,
 `ambiguous_excluded_rate`, and `ambiguous_as_tp_rate`. This denominator is the
 517 strict pattern-family memberships, not the 407 unique strict cancellation
-families. If a unique-family prevalence estimate is needed, create a separate
-sample whose unit is one strict cancellation family.
+families. Its sampling variance should use stratum weights and finite-population
+correction; in practice the non-census contribution is dominated by
+`post-subresource-cancel` and `post-action-cancel`.
+
+Use the strict-family sheet for the 407-family estimate:
+
+```text
+family_rate = labeled_operation_cancellation_families / sampled_strict_families
+```
+
+The current full sheet is a simple random sample of 140 out of 407 strict
+families. Apply finite-population correction to its interval and report labeling
+disagreement separately.
 
 Report separate estimates for:
 
@@ -295,6 +379,8 @@ Proceed to an Internet-Draft skeleton if:
   high enough that the dominant-shape argument survives manual review;
 - per-pattern TP rates and the weighted strict pattern-family estimate are
   published with ambiguity bounds, confidence intervals, and denominator caveats;
+- the strict-family sample is labeled before updating unique-family denominator
+  claims over 407 / 194 / 215 families;
 - domain-state-transition examples are explicitly acknowledged in the
   motivation;
 - `delete-operation-resource` is either kept as supporting evidence or promoted

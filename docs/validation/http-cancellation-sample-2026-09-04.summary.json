@@ -22,10 +22,11 @@
   },
   "estimationGuidance": {
     "ambiguous": "Report ambiguous-as-false-positive and ambiguous-as-true-positive bounds, plus an explicit non-ambiguous rate.",
-    "confidenceIntervals": "Use Wilson or Clopper-Pearson intervals for sampled strata. Mark full-census strata separately rather than applying a sampling-error interval.",
+    "confidenceIntervals": "Use Wilson or Clopper-Pearson intervals for sampled strata, add finite-population correction for near-census strata, and mark full-census strata separately.",
     "deleteOperationResource": "Report separately as an audit stratum for possible strict-rule promotion; do not mix it into strict-cancellation estimates.",
     "doNotPoolRawRows": true,
-    "strictCancellation": "Compute per-pattern rates and a pattern-family weighted estimate using populationFamilyMemberships. This estimates pattern-family membership precision, not unique-family prevalence over 407 families."
+    "strictCancellation": "Compute per-pattern rates and a pattern-family weighted estimate using populationFamilyMemberships. This estimates pattern-family membership precision, not unique-family prevalence over 407 families.",
+    "strictFamilySensitivity": "strictFamilyApproxInclusionProbability gives a collapse-to-family sensitivity check using 1 - product(1 - patternSamplingFraction). Treat it as exploratory because bucket quotas and repository caps make the exact design probability more complex."
   },
   "populationFamilyMembershipsByPattern": {
     "delete-action-cancel": 31,

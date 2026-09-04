@@ -31,7 +31,7 @@ from rfc_miner.models import error_record
 from rfc_miner.normalization import normalize_evidence, normalize_path, normalize_record
 from rfc_miner.paths import data_paths
 from rfc_miner.reporting import write_report
-from rfc_miner.sampling import write_cancellation_sample
+from rfc_miner.sampling import write_cancellation_family_sample, write_cancellation_sample
 from rfc_miner.scoring import score_opportunities
 from rfc_miner.standards import compare_standards
 from rfc_miner.streaming import collect_and_analyze_streaming
@@ -544,6 +544,7 @@ class PipelineTests(unittest.TestCase):
             self.assertEqual({row["estimationPopulation"] for row in rows}, {"strict-cancellation"})
             self.assertEqual({row["populationFamilyMemberships"] for row in rows}, {"2"})
             self.assertTrue(all(row["familyPatternCancellationEvidence"] for row in rows))
+            self.assertTrue(all(row["strictFamilyApproxInclusionProbability"] for row in rows))
             self.assertEqual(
                 {row["linkageBucket"] for row in rows},
                 {"mixed-same-resource-and-risk", "domain-transition-risk"},
@@ -554,6 +555,103 @@ class PipelineTests(unittest.TestCase):
             summary = json.loads(output.with_suffix(".summary.json").read_text(encoding="utf-8"))
             self.assertTrue(summary["estimationGuidance"]["doNotPoolRawRows"])
             self.assertEqual(summary["samplingUnit"], "family-pattern-representative")
+
+    def test_cancellation_family_sample_uses_unique_families(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            paths = data_paths(temporary)
+            write_jsonl(
+                paths.repositories,
+                [
+                    {"repo_id": "example/ops", "repository_url": "https://github.com/example/ops"},
+                    {
+                        "repo_id": "example/domain",
+                        "repository_url": "https://github.com/example/domain",
+                    },
+                ],
+            )
+            write_jsonl(
+                paths.raw_evidence,
+                [
+                    {
+                        "repository": "example/ops",
+                        "commit": "abc123",
+                        "concept": "http-async-operation",
+                        "evidenceType": "route",
+                        "httpMethod": "GET",
+                        "path": "/jobs/{id}/status",
+                        "responseCodes": [200],
+                        "file": "openapi.yaml",
+                        "lineStart": 1,
+                        "lineEnd": 1,
+                        "confidence": 0.9,
+                        "extractedValue": {},
+                        "extractor": "openapi",
+                    },
+                    {
+                        "repository": "example/ops",
+                        "commit": "abc123",
+                        "concept": "http-cancellation",
+                        "evidenceType": "route",
+                        "httpMethod": "POST",
+                        "path": "/jobs/{id}/cancel",
+                        "responseCodes": [202],
+                        "file": "openapi.yaml",
+                        "lineStart": 2,
+                        "lineEnd": 2,
+                        "confidence": 0.96,
+                        "extractedValue": {},
+                        "extractor": "openapi",
+                    },
+                    {
+                        "repository": "example/ops",
+                        "commit": "abc123",
+                        "concept": "http-cancellation",
+                        "evidenceType": "route",
+                        "httpMethod": "PUT",
+                        "path": "/jobs/{id}/cancel",
+                        "responseCodes": [202],
+                        "file": "openapi.yaml",
+                        "lineStart": 3,
+                        "lineEnd": 3,
+                        "confidence": 0.88,
+                        "extractedValue": {},
+                        "extractor": "openapi",
+                    },
+                    {
+                        "repository": "example/domain",
+                        "commit": "def456",
+                        "concept": "http-cancellation",
+                        "evidenceType": "route",
+                        "httpMethod": "POST",
+                        "path": "/subscriptions/{id}/cancel",
+                        "responseCodes": [200],
+                        "file": "openapi.yaml",
+                        "lineStart": 2,
+                        "lineEnd": 2,
+                        "confidence": 0.78,
+                        "extractedValue": {},
+                        "extractor": "openapi",
+                    },
+                ],
+            )
+            normalize_evidence(paths=paths)
+            dedupe_repositories(paths=paths)
+
+            output, count = write_cancellation_family_sample(paths=paths, profile="minimum", seed=1)
+            with output.open("r", encoding="utf-8", newline="") as handle:
+                rows = list(csv.DictReader(handle))
+
+            self.assertEqual(count, 2)
+            self.assertEqual(len({row["family_id"] for row in rows}), len(rows))
+            self.assertEqual({row["samplingUnit"] for row in rows}, {"strict-cancellation-family"})
+            self.assertEqual({row["estimationPopulation"] for row in rows}, {"strict-cancellation-family"})
+            self.assertEqual({row["populationStrictFamilies"] for row in rows}, {"2"})
+            ops_row = next(row for row in rows if row["repository"] == "example/ops")
+            self.assertEqual(ops_row["strictFamilyPatternMemberships"], "post-subresource-cancel,put-action-cancel")
+            self.assertTrue(ops_row["strictFamilyCancellationEvidence"])
+            summary = json.loads(output.with_suffix(".summary.json").read_text(encoding="utf-8"))
+            self.assertEqual(summary["samplingUnit"], "strict-cancellation-family")
+            self.assertEqual(summary["populationStrictFamilies"], 2)
 
     def test_collect_records_clone_errors_and_continues(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:

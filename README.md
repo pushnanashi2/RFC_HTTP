@@ -124,6 +124,7 @@ seed is written.
 - `data/results/candidates/http-cancellation.md` — cancellation candidate report, including route-level operation linkage
 - `data/results/manual-review.md` — TP/FP/FN validation checklist
 - `data/results/validation/http-cancellation-sample.csv` — stratified family-pattern cancellation labeling sheet
+- `data/results/validation/http-cancellation-family-sample.csv` — strict-family cancellation labeling sheet
 
 ## Reading the scores
 
@@ -152,10 +153,22 @@ Do not publish a raw pooled TP rate from the sheet: report per-pattern rates and
 a strict pattern-family weighted estimate, with `delete-operation-resource`
 handled as a separate promotion audit.
 
+Use the strict-family sample sheet for claims over the 407 strict cancellation
+families. The pattern-family sheet estimates the 517 membership frame, not the
+407 unique-family denominator.
+
 Generate the cancellation sample sheet with:
 
 ```bash
 rfc-miner sample-cancellation \
+  --data-dir /mnt/cash-data/rfc-http-miner/data-5000-refined \
+  --profile full
+```
+
+Generate the unique-family cancellation sample sheet with:
+
+```bash
+rfc-miner sample-cancellation-family \
   --data-dir /mnt/cash-data/rfc-http-miner/data-5000-refined \
   --profile full
 ```
@@ -168,6 +181,7 @@ rfc-miner sample-cancellation \
 - `docs/prior-art/http-cancellation.md`
 - `docs/validation/http-cancellation-sampling-protocol.md`
 - `docs/validation/http-cancellation-sample-2026-09-04.csv`
+- `docs/validation/http-cancellation-family-sample-2026-09-04.csv`
 - `docs/drafts/http-operation-cancellation-outline.md`
 - `docs/runs/2026-09-04-5000-final.md`
 - `docs/runs/2026-09-04-5000-analysis.md`

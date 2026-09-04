@@ -1,0 +1,26 @@
+{
+  "analysisWeight": "2.907143",
+  "byLinkageBucket": {
+    "domain-transition-risk": 70,
+    "mixed-operation-target-and-risk": 6,
+    "mixed-same-resource-and-risk": 31,
+    "operation-like-target": 2,
+    "same-resource-linked": 31
+  },
+  "byStrictFamilyPatternMembershipCount": {
+    "1": 102,
+    "2": 33,
+    "3": 5
+  },
+  "estimationGuidance": {
+    "confidenceIntervals": "Use a finite-population corrected interval for the simple random sample. Report labeling disagreement separately.",
+    "mixedFamilies": "Inspect strictFamilyCancellationEvidence because a family can contain both operation cancellation and business cancellation routes.",
+    "primaryLabel": "Label whether the family exposes at least one operation-cancellation affordance among strict cancellation evidence.",
+    "purpose": "Use this sheet, not the pattern-family sheet, when updating unique-family claims over the 407 strict cancellation families."
+  },
+  "estimationPopulation": "strict-cancellation-family",
+  "populationStrictFamilies": 407,
+  "sampleCount": 140,
+  "samplingFraction": "0.343980",
+  "samplingUnit": "strict-cancellation-family"
+}

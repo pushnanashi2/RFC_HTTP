@@ -37,6 +37,11 @@ MINIMUM_SAMPLE_SIZES = {
 }
 
 PATTERN_ORDER = tuple(FULL_SAMPLE_SIZES)
+STRICT_PATTERN_ORDER = tuple(pattern for pattern in PATTERN_ORDER if pattern != "delete-operation-resource")
+STRICT_FAMILY_SAMPLE_SIZES = {
+    "full": 140,
+    "minimum": 80,
+}
 BUCKET_ORDER = (
     "mixed-same-resource-and-risk",
     "same-resource-linked",
@@ -62,6 +67,51 @@ SAMPLE_COLUMNS = [
     "familyPatternHasOperationTarget",
     "familyPatternHasDomainTransitionRisk",
     "familyPatternCancellationEvidence",
+    "strictFamilyPatternMemberships",
+    "strictFamilyApproxInclusionProbability",
+    "strictFamilyApproxAnalysisWeight",
+    "httpMethod",
+    "normalizedPath",
+    "path",
+    "sourceKind",
+    "file",
+    "lineStart",
+    "commit",
+    "symbol",
+    "responseCodes",
+    "confidence",
+    "cancelTargetPath",
+    "routeLevelOperationLinked",
+    "operationTarget",
+    "domainTransitionRisk",
+    "primaryLabel",
+    "secondaryFlags",
+    "reviewerConfidence",
+    "rationale",
+    "adjacentOperationEvidence",
+    "terminalStateEvidence",
+    "responseSemanticsEvidence",
+    "reviewer",
+    "adjudicatedLabel",
+]
+
+FAMILY_SAMPLE_COLUMNS = [
+    "sample_id",
+    "samplingUnit",
+    "estimationPopulation",
+    "family_id",
+    "repository",
+    "pattern",
+    "linkageBucket",
+    "populationStrictFamilies",
+    "strictFamilySampleSize",
+    "strictFamilySamplingFraction",
+    "strictFamilyAnalysisWeight",
+    "strictFamilyPatternMemberships",
+    "strictFamilyHasSameResourceLinked",
+    "strictFamilyHasOperationTarget",
+    "strictFamilyHasDomainTransitionRisk",
+    "strictFamilyCancellationEvidence",
     "httpMethod",
     "normalizedPath",
     "path",
@@ -107,10 +157,41 @@ def write_cancellation_sample(
     )
 
     target = Path(output_path) if output_path else paths.results_dir / "validation" / "http-cancellation-sample.csv"
-    write_csv(target, rows)
+    write_csv(target, rows, columns=SAMPLE_COLUMNS)
     write_json(
         target.with_suffix(".summary.json"),
         sample_summary(rows),
+    )
+    return target, len(rows)
+
+
+def write_cancellation_family_sample(
+    *,
+    paths: DataPaths,
+    output_path: str | Path | None = None,
+    profile: str = "full",
+    seed: int = 20260904,
+) -> tuple[Path, int]:
+    ensure_data_dirs(paths)
+    evidence = read_jsonl(paths.normalized_evidence)
+    families = read_jsonl(paths.families)
+    family_by_repo = {str(record.get("repo_id") or ""): record for record in families}
+    rows = build_cancellation_family_sample_records(
+        evidence=evidence,
+        family_by_repo=family_by_repo,
+        profile=profile,
+        seed=seed,
+    )
+
+    target = (
+        Path(output_path)
+        if output_path
+        else paths.results_dir / "validation" / "http-cancellation-family-sample.csv"
+    )
+    write_csv(target, rows, columns=FAMILY_SAMPLE_COLUMNS)
+    write_json(
+        target.with_suffix(".summary.json"),
+        family_sample_summary(rows),
     )
     return target, len(rows)
 
@@ -156,6 +237,7 @@ def build_cancellation_sample_records(
         rows_by_pattern_family[pattern][family_id].append(row)
 
     grouped = group_family_pattern_representatives(rows_by_pattern_family)
+    strict_patterns_by_family = strict_pattern_memberships_by_family(rows_by_pattern_family)
 
     selected: list[dict[str, str]] = []
     repository_pattern_counts: Counter[tuple[str, str]] = Counter()
@@ -175,7 +257,63 @@ def build_cancellation_sample_records(
 
     for index, row in enumerate(selected, start=1):
         row["sample_id"] = f"cancel-{index:04d}"
-    add_sampling_weights(selected)
+    add_sampling_weights(selected, strict_patterns_by_family=strict_patterns_by_family)
+    return selected
+
+
+def build_cancellation_family_sample_records(
+    *,
+    evidence: list[dict[str, Any]],
+    family_by_repo: dict[str, dict[str, Any]],
+    profile: str = "full",
+    seed: int = 20260904,
+) -> list[dict[str, str]]:
+    target_size = strict_family_sample_size(profile)
+    async_paths_by_repo = async_operation_paths_by_repo(
+        evidence=evidence,
+        family_by_repo=family_by_repo,
+    )
+    async_index = async_evidence_index(
+        evidence=evidence,
+        family_by_repo=family_by_repo,
+    )
+    rows_by_family: dict[str, list[dict[str, str]]] = defaultdict(list)
+
+    for record in evidence:
+        if str(record.get("concept") or "") != "http-cancellation":
+            continue
+        if str(record.get("pattern") or "") not in STRICT_PATTERN_ORDER:
+            continue
+        repo_id = str(record.get("repository") or "")
+        family_id = included_family_id(repo_id, family_by_repo)
+        if family_id is None:
+            continue
+        linkage = cancellation_record_linkage(
+            record=record,
+            async_paths_by_repo=async_paths_by_repo,
+        )
+        row = sample_row(
+            record=record,
+            family_id=family_id,
+            linkage=linkage,
+            adjacent_records=async_index.get((repo_id, linkage["cancelTargetPath"]), []),
+        )
+        rows_by_family[family_id].append(row)
+
+    family_rows = [strict_family_representative(family_id, rows) for family_id, rows in rows_by_family.items()]
+    family_rows.sort(key=lambda row: row["family_id"])
+    rng = random.Random(f"{seed}:strict-cancellation-family")
+    rng.shuffle(family_rows)
+    selected = family_rows[: min(target_size, len(family_rows))]
+    population_count = len(family_rows)
+    sample_count = len(selected)
+
+    for index, row in enumerate(selected, start=1):
+        row["sample_id"] = f"cancel-family-{index:04d}"
+        row["populationStrictFamilies"] = str(population_count)
+        row["strictFamilySampleSize"] = str(sample_count)
+        row["strictFamilySamplingFraction"] = format_ratio(sample_count, population_count)
+        row["strictFamilyAnalysisWeight"] = format_float(population_count / sample_count if sample_count else 0.0)
     return selected
 
 
@@ -185,6 +323,13 @@ def sample_size_profile(profile: str) -> dict[str, int]:
     if profile == "minimum":
         return dict(MINIMUM_SAMPLE_SIZES)
     raise ValueError(f"unknown cancellation sample profile: {profile}")
+
+
+def strict_family_sample_size(profile: str) -> int:
+    try:
+        return STRICT_FAMILY_SAMPLE_SIZES[profile]
+    except KeyError as error:
+        raise ValueError(f"unknown cancellation family sample profile: {profile}") from error
 
 
 def async_evidence_index(
@@ -227,6 +372,48 @@ def group_family_pattern_representatives(
             representative["familyPatternCancellationEvidence"] = format_sample_row_evidence(rows)
             grouped[pattern][representative["linkageBucket"]][family_id].append(representative)
     return grouped
+
+
+def strict_pattern_memberships_by_family(
+    rows_by_pattern_family: dict[str, dict[str, list[dict[str, str]]]],
+) -> dict[str, set[str]]:
+    memberships: dict[str, set[str]] = defaultdict(set)
+    for pattern in STRICT_PATTERN_ORDER:
+        for family_id in rows_by_pattern_family.get(pattern, {}):
+            memberships[family_id].add(pattern)
+    return memberships
+
+
+def strict_family_representative(family_id: str, rows: list[dict[str, str]]) -> dict[str, str]:
+    has_same_resource = any(row["routeLevelOperationLinked"] == "true" for row in rows)
+    has_operation_target = any(row["operationTarget"] == "true" for row in rows)
+    has_domain_risk = any(row["domainTransitionRisk"] == "true" for row in rows)
+    patterns = {row["pattern"] for row in rows}
+    representative = dict(sorted(rows, key=row_quality_key)[0])
+    representative.update(
+        {
+            "sample_id": "",
+            "samplingUnit": "strict-cancellation-family",
+            "estimationPopulation": "strict-cancellation-family",
+            "linkageBucket": family_pattern_bucket(
+                has_same_resource=has_same_resource,
+                has_operation_target=has_operation_target,
+                has_domain_risk=has_domain_risk,
+            ),
+            "populationStrictFamilies": "",
+            "strictFamilySampleSize": "",
+            "strictFamilySamplingFraction": "",
+            "strictFamilyAnalysisWeight": "",
+            "strictFamilyPatternMemberships": ",".join(
+                pattern for pattern in STRICT_PATTERN_ORDER if pattern in patterns
+            ),
+            "strictFamilyHasSameResourceLinked": str(has_same_resource).lower(),
+            "strictFamilyHasOperationTarget": str(has_operation_target).lower(),
+            "strictFamilyHasDomainTransitionRisk": str(has_domain_risk).lower(),
+            "strictFamilyCancellationEvidence": format_sample_row_evidence(rows, limit=10),
+        }
+    )
+    return representative
 
 
 def family_pattern_bucket(
@@ -399,6 +586,9 @@ def sample_row(
         "familyPatternHasOperationTarget": str(bool(linkage.get("operationTarget"))).lower(),
         "familyPatternHasDomainTransitionRisk": str(bool(linkage.get("domainTransitionRisk"))).lower(),
         "familyPatternCancellationEvidence": "",
+        "strictFamilyPatternMemberships": "",
+        "strictFamilyApproxInclusionProbability": "",
+        "strictFamilyApproxAnalysisWeight": "",
         "httpMethod": str(record.get("httpMethod") or ""),
         "normalizedPath": str(record.get("normalizedPath") or ""),
         "path": str(record.get("path") or ""),
@@ -427,14 +617,40 @@ def sample_row(
     }
 
 
-def add_sampling_weights(rows: list[dict[str, str]]) -> None:
+def add_sampling_weights(
+    rows: list[dict[str, str]],
+    *,
+    strict_patterns_by_family: dict[str, set[str]] | None = None,
+) -> None:
     sample_counts = Counter(row["pattern"] for row in rows)
+    population_counts = {
+        pattern: safe_int(next(row["populationFamilyMemberships"] for row in rows if row["pattern"] == pattern))
+        for pattern in sample_counts
+    }
+    pattern_fractions = {
+        pattern: sample_counts[pattern] / population_counts[pattern]
+        for pattern in sample_counts
+        if population_counts[pattern] > 0
+    }
     for row in rows:
         sample_count = sample_counts[row["pattern"]]
         population_count = safe_int(row["populationFamilyMemberships"])
         row["patternSampleSize"] = str(sample_count)
         row["patternSamplingFraction"] = format_ratio(sample_count, population_count)
         row["analysisWeight"] = format_ratio(population_count, sample_count)
+        if row["estimationPopulation"] != "strict-cancellation" or strict_patterns_by_family is None:
+            continue
+        memberships = [
+            pattern
+            for pattern in STRICT_PATTERN_ORDER
+            if pattern in strict_patterns_by_family.get(row["family_id"], set())
+        ]
+        row["strictFamilyPatternMemberships"] = ",".join(memberships)
+        inclusion_probability = family_inclusion_probability(memberships, pattern_fractions)
+        row["strictFamilyApproxInclusionProbability"] = format_float(inclusion_probability)
+        row["strictFamilyApproxAnalysisWeight"] = format_float(
+            1 / inclusion_probability if inclusion_probability else 0.0
+        )
 
 
 def estimation_population(pattern: str) -> str:
@@ -485,6 +701,13 @@ def format_sample_row_evidence(rows: list[dict[str, str]], *, limit: int = 5) ->
     return " | ".join(fragments)
 
 
+def family_inclusion_probability(memberships: list[str], pattern_fractions: dict[str, float]) -> float:
+    missed_probability = 1.0
+    for pattern in memberships:
+        missed_probability *= 1 - pattern_fractions.get(pattern, 0.0)
+    return 1 - missed_probability
+
+
 def sample_row_route_bucket(row: dict[str, str]) -> str:
     if row["routeLevelOperationLinked"] == "true":
         return "same-resource-linked"
@@ -525,6 +748,12 @@ def sample_summary(rows: list[dict[str, str]]) -> dict[str, Any]:
                 "using populationFamilyMemberships. This estimates pattern-family "
                 "membership precision, not unique-family prevalence over 407 families."
             ),
+            "strictFamilySensitivity": (
+                "strictFamilyApproxInclusionProbability gives a collapse-to-family sensitivity "
+                "check using 1 - product(1 - patternSamplingFraction). Treat it as exploratory "
+                "because bucket quotas and repository caps make the exact design probability "
+                "more complex."
+            ),
             "deleteOperationResource": (
                 "Report separately as an audit stratum for possible strict-rule promotion; "
                 "do not mix it into strict-cancellation estimates."
@@ -534,20 +763,55 @@ def sample_summary(rows: list[dict[str, str]]) -> dict[str, Any]:
                 "plus an explicit non-ambiguous rate."
             ),
             "confidenceIntervals": (
-                "Use Wilson or Clopper-Pearson intervals for sampled strata. Mark full-census "
-                "strata separately rather than applying a sampling-error interval."
+                "Use Wilson or Clopper-Pearson intervals for sampled strata, add finite-population "
+                "correction for near-census strata, and mark full-census strata separately."
             ),
         },
     }
 
 
-def write_csv(path: Path, rows: list[dict[str, str]]) -> None:
+def family_sample_summary(rows: list[dict[str, str]]) -> dict[str, Any]:
+    by_pattern_count = Counter(str(len(row["strictFamilyPatternMemberships"].split(","))) for row in rows)
+    by_bucket = Counter(row["linkageBucket"] for row in rows)
+    population_count = safe_int(rows[0]["populationStrictFamilies"]) if rows else 0
+    sample_count = len(rows)
+    return {
+        "samplingUnit": "strict-cancellation-family",
+        "estimationPopulation": "strict-cancellation-family",
+        "sampleCount": sample_count,
+        "populationStrictFamilies": population_count,
+        "samplingFraction": format_ratio(sample_count, population_count),
+        "analysisWeight": format_float(population_count / sample_count if sample_count else 0.0),
+        "byLinkageBucket": dict(sorted(by_bucket.items())),
+        "byStrictFamilyPatternMembershipCount": dict(sorted(by_pattern_count.items())),
+        "estimationGuidance": {
+            "purpose": (
+                "Use this sheet, not the pattern-family sheet, when updating unique-family "
+                "claims over the 407 strict cancellation families."
+            ),
+            "primaryLabel": (
+                "Label whether the family exposes at least one operation-cancellation affordance "
+                "among strict cancellation evidence."
+            ),
+            "confidenceIntervals": (
+                "Use a finite-population corrected interval for the simple random sample. "
+                "Report labeling disagreement separately."
+            ),
+            "mixedFamilies": (
+                "Inspect strictFamilyCancellationEvidence because a family can contain both "
+                "operation cancellation and business cancellation routes."
+            ),
+        },
+    }
+
+
+def write_csv(path: Path, rows: list[dict[str, str]], *, columns: list[str]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     temporary = path.with_suffix(path.suffix + ".tmp")
     with temporary.open("w", encoding="utf-8", newline="") as handle:
         writer = csv.DictWriter(
             handle,
-            fieldnames=SAMPLE_COLUMNS,
+            fieldnames=columns,
             extrasaction="ignore",
             lineterminator="\n",
         )
@@ -574,3 +838,7 @@ def format_ratio(numerator: int, denominator: int) -> str:
     if denominator <= 0:
         return ""
     return f"{numerator / denominator:.6f}"
+
+
+def format_float(value: float) -> str:
+    return f"{value:.6f}"

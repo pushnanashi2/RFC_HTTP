@@ -303,8 +303,8 @@ def append_operation_linkage(
     lines.append("### Pattern Memberships")
     lines.append("")
     lines.append(
-        "Rows are non-exclusive memberships. Do not add row counts together or compare "
-        "their sum to the strict family total."
+        "Rows are non-exclusive memberships. Do not compare their sum to the strict "
+        "family total; the membership sum is valid only as a sampling-frame size."
     )
     lines.append("")
     lines.append("| Pattern | Families | Same-resource linked | Operation target | Domain-transition risk | Counting rule |")

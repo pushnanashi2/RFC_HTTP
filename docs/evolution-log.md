@@ -191,3 +191,13 @@ This log records why extraction and analysis logic changes over time.
 - expected effect: Labeling produces per-pattern rates and a strict pattern-family weighted estimate rather than an invalid pooled TP rate.
 - actual effect: The protocol now requires ambiguity bounds, Wilson or Clopper-Pearson intervals, census-stratum handling, two blind reviewers, agreement reporting, and adjudication before drafting.
 - regression added: Tests verify sample rows are unique by `family_id` × `pattern` and carry estimator metadata.
+
+## 2026-09-04 — Strict-family cancellation sampling
+
+- problem: Pattern-family sampling cannot update unique-family claims over the 407 strict cancellation families.
+- observed failure: The report treated the 517 membership frame correctly in one paragraph but still implied that the same sample could update the 407-family denominator.
+- root cause: Families with multiple strict cancellation patterns have multiple inclusion chances and can bias a collapsed family-level TP estimate upward.
+- change: Added a separate `sample-cancellation-family` command and generated a 140-row simple random sample over the 407 strict cancellation families.
+- expected effect: Pattern-family precision and unique-family prevalence are measured with separate sheets and separate estimators.
+- actual effect: The documentation now treats the pattern-family sheet as a 517-membership frame, the family sheet as the 407-family frame, and the IPW collapse from the pattern sheet as exploratory only.
+- regression added: Tests verify the family sample contains unique `family_id` rows and strict-family estimator metadata.
