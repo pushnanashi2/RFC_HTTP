@@ -29,6 +29,9 @@ pins the commit, extracts evidence, writes intermediate artifacts, and removes
 the checkout unless `--keep-repos` is passed. This keeps the Stage-1 corpus
 workable on small disks while preserving reproducible commit hashes.
 
+Large runs can move temporary checkouts and generated data with
+`RFC_MINER_REPO_DIR` and `RFC_MINER_DATA_DIR`.
+
 ## Modules
 
 - `rfc_miner.collector`: seed-based GitHub repository collection and commit

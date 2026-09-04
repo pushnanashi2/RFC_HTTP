@@ -53,6 +53,13 @@ The default `run` mode clones one repository at a time, pins its commit,
 extracts evidence, and removes the checkout after analysis. Pass `--keep-repos`
 when you want to keep shallow copies in `data/repos` for debugging.
 
+For large corpus runs, put temporary checkouts on a large external disk:
+
+```bash
+export RFC_MINER_REPO_DIR=/mnt/cash-data/rfc-http-miner/repos
+export RFC_MINER_DATA_DIR=/mnt/cash-data/rfc-http-miner/data
+```
+
 ```bash
 rfc-miner run \
   --seed config/corpus/stage1-http.json \

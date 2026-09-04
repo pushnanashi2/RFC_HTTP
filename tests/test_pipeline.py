@@ -16,6 +16,7 @@ SRC = ROOT / "src"
 sys.path.insert(0, str(SRC))
 
 from rfc_miner.clustering import cluster_patterns
+from rfc_miner.cli import build_parser
 from rfc_miner.collector import collect_repositories
 from rfc_miner.deduplication import dedupe_repositories
 from rfc_miner.extractors.source_routes import extract_source_routes
@@ -169,6 +170,18 @@ class PipelineTests(unittest.TestCase):
             self.assertIn("report:", result.stdout)
             report = Path(temporary) / "data" / "results" / "report.md"
             self.assertTrue(report.exists())
+
+    def test_cli_uses_storage_environment_defaults(self) -> None:
+        with patch.dict(
+            os.environ,
+            {
+                "RFC_MINER_DATA_DIR": "/tmp/rfc-miner-data",
+                "RFC_MINER_REPO_DIR": "/tmp/rfc-miner-repos",
+            },
+        ):
+            args = build_parser().parse_args(["run"])
+        self.assertEqual(args.data_dir, "/tmp/rfc-miner-data")
+        self.assertEqual(args.repo_dir, "/tmp/rfc-miner-repos")
 
     def fixture_repositories(self) -> list[dict[str, object]]:
         raw = read_jsonl(ROOT / "tests" / "fixtures" / "data" / "raw" / "repositories.jsonl")

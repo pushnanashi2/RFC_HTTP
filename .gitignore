@@ -6,7 +6,7 @@ __pycache__/
 src/*.egg-info/
 build/
 dist/
-data/repos/
+data/repos
 data/raw/*.tmp
 data/normalized/*.tmp
 data/results/*.tmp

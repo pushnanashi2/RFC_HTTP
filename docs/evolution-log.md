@@ -26,8 +26,8 @@ This log records why extraction and analysis logic changes over time.
 
 - problem: Stage-1 execution could fill the local disk because `run` collected all repository checkouts before analysis.
 - observed failure: A 30-repository run exhausted available disk space and a single clone failure stopped the full corpus.
-- root cause: Collection and analysis were separated inside the one-shot `run` command, so large shallow clones accumulated before evidence extraction.
-- change: Added streaming collection/analyze mode for `run`, plus clone-error capture and cleanup of partial checkouts.
+- root cause: Collection and analysis were separated inside the one-shot `run` command, so large shallow clones accumulated before evidence extraction; the default checkout path also used the small root disk unless overridden.
+- change: Added streaming collection/analyze mode for `run`, clone-error capture, cleanup of partial checkouts, and `RFC_MINER_REPO_DIR` / `RFC_MINER_DATA_DIR` storage overrides.
 - expected effect: Real corpus runs continue across individual clone failures and keep only one checkout on disk by default.
 - actual effect: A 30-repository Stage-1 run completed with zero extraction errors while leaving `data/repos` empty after checkout cleanup.
 - regression added: Existing CLI fixture pipeline exercises the streaming-compatible downstream stages; real corpus run will validate cleanup behavior.

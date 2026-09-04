@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import os
 from pathlib import Path
 
 from .clustering import cluster_patterns
@@ -27,7 +28,7 @@ def build_parser() -> argparse.ArgumentParser:
     collect = subcommands.add_parser("collect", help="collect and pin repositories")
     add_common(collect)
     collect.add_argument("--seed", default=str(default_path(DEFAULT_SEED_REL)))
-    collect.add_argument("--repo-dir", default="data/repos")
+    collect.add_argument("--repo-dir", default=default_repo_dir())
     collect.add_argument("--limit", type=int, default=30)
     collect.add_argument("--no-clone", action="store_true")
 
@@ -60,7 +61,7 @@ def build_parser() -> argparse.ArgumentParser:
     run = subcommands.add_parser("run", help="run the full pipeline")
     add_common(run)
     run.add_argument("--seed", default=str(default_path(DEFAULT_SEED_REL)))
-    run.add_argument("--repo-dir", default="data/repos")
+    run.add_argument("--repo-dir", default=default_repo_dir())
     run.add_argument("--limit", type=int, default=30)
     run.add_argument("--repositories")
     run.add_argument("--standards", default=str(default_path(DEFAULT_STANDARDS_REL)))
@@ -72,7 +73,11 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def add_common(parser: argparse.ArgumentParser) -> None:
-    parser.add_argument("--data-dir", default="data")
+    parser.add_argument("--data-dir", default=os.environ.get("RFC_MINER_DATA_DIR", "data"))
+
+
+def default_repo_dir() -> str:
+    return os.environ.get("RFC_MINER_REPO_DIR", "data/repos")
 
 
 def default_path(relative_path: Path) -> Path:
