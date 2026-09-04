@@ -1,0 +1,15 @@
+{
+  "id": "http-cancellation",
+  "description": "HTTP APIs that cancel, abort, stop, terminate, kill, or delete an asynchronous operation resource.",
+  "positive_indicators": [
+    "cancel",
+    "abort",
+    "stop",
+    "terminate",
+    "kill",
+    "DELETE job/task/operation"
+  ],
+  "negative_indicators": [
+    "delete persistent business resource unrelated to operation lifecycle"
+  ]
+}

@@ -1,0 +1,126 @@
+{
+  "standards": [
+    {
+      "id": "RFC9110",
+      "title": "HTTP Semantics",
+      "url": "https://www.rfc-editor.org/rfc/rfc9110.html",
+      "concepts": [
+        "http-async-operation",
+        "http-cancellation"
+      ],
+      "confidence": 0.9,
+      "conceptCoverage": {
+        "http-async-operation": {
+          "coverage": "partial",
+          "gap": "Defines 202 Accepted, Location, methods, and resource semantics, but not a reusable long-running operation lifecycle pattern.",
+          "conflict": "none",
+          "evidence": [
+            "202 Accepted",
+            "Location"
+          ],
+          "confidence": 0.9
+        },
+        "http-cancellation": {
+          "coverage": "adjacent",
+          "gap": "Defines method semantics such as DELETE and PATCH, but not cancellation-specific lifecycle guarantees.",
+          "conflict": "none",
+          "evidence": [
+            "DELETE",
+            "PATCH"
+          ],
+          "confidence": 0.8
+        }
+      }
+    },
+    {
+      "id": "RFC8288",
+      "title": "Web Linking",
+      "url": "https://www.rfc-editor.org/rfc/rfc8288.html",
+      "concepts": [
+        "http-async-operation"
+      ],
+      "confidence": 0.8,
+      "conceptCoverage": {
+        "http-async-operation": {
+          "coverage": "adjacent",
+          "gap": "Can express links to status or result resources, but does not define operation lifecycle relations.",
+          "conflict": "none",
+          "evidence": [
+            "Link header"
+          ],
+          "confidence": 0.75
+        }
+      }
+    },
+    {
+      "id": "RFC7240",
+      "title": "Prefer Header for HTTP",
+      "url": "https://www.rfc-editor.org/rfc/rfc7240.html",
+      "concepts": [
+        "http-async-operation"
+      ],
+      "confidence": 0.8,
+      "conceptCoverage": {
+        "http-async-operation": {
+          "coverage": "adjacent",
+          "gap": "Defines request preferences such as respond-async, but not a complete operation resource shape.",
+          "conflict": "none",
+          "evidence": [
+            "Prefer: respond-async"
+          ],
+          "confidence": 0.75
+        }
+      }
+    },
+    {
+      "id": "RFC9457",
+      "title": "Problem Details for HTTP APIs",
+      "url": "https://www.rfc-editor.org/rfc/rfc9457.html",
+      "concepts": [
+        "http-async-operation",
+        "http-cancellation"
+      ],
+      "confidence": 0.8,
+      "conceptCoverage": {
+        "http-async-operation": {
+          "coverage": "adjacent",
+          "gap": "Covers error representation, not operation lifecycle or polling interactions.",
+          "conflict": "none",
+          "evidence": [
+            "problem detail object"
+          ],
+          "confidence": 0.7
+        },
+        "http-cancellation": {
+          "coverage": "adjacent",
+          "gap": "Can represent cancellation errors, but does not define cancellation interaction semantics.",
+          "conflict": "none",
+          "evidence": [
+            "problem detail object"
+          ],
+          "confidence": 0.7
+        }
+      }
+    },
+    {
+      "id": "draft-ietf-httpapi-idempotency-key-header",
+      "title": "The Idempotency-Key HTTP Header Field",
+      "url": "https://datatracker.ietf.org/doc/draft-ietf-httpapi-idempotency-key-header/",
+      "concepts": [
+        "http-async-operation"
+      ],
+      "confidence": 0.7,
+      "conceptCoverage": {
+        "http-async-operation": {
+          "coverage": "adjacent",
+          "gap": "Helps retry non-idempotent creation requests, but does not define async operation lifecycle, status, or cancellation patterns.",
+          "conflict": "none",
+          "evidence": [
+            "Idempotency-Key"
+          ],
+          "confidence": 0.7
+        }
+      }
+    }
+  ]
+}

@@ -1,0 +1,22 @@
+[build-system]
+requires = ["setuptools>=69", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "rfc-http-miner"
+version = "0.1.0"
+description = "Evidence-first OSS HTTP API standardization opportunity miner"
+readme = "README.md"
+requires-python = ">=3.10"
+license = { file = "LICENSE" }
+authors = [{ name = "pushnanashi2" }]
+dependencies = []
+
+[project.scripts]
+rfc-miner = "rfc_miner.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+rfc_miner = ["py.typed"]

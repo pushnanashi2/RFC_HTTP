@@ -1,0 +1,18 @@
+{
+  "id": "http-async-operation",
+  "description": "HTTP APIs that create, expose, or poll long-running operation resources.",
+  "positive_indicators": [
+    "202 Accepted",
+    "job",
+    "operation",
+    "task",
+    "run",
+    "execution",
+    "workflow",
+    "status",
+    "progress"
+  ],
+  "negative_indicators": [
+    "pure synchronous CRUD without operation lifecycle evidence"
+  ]
+}

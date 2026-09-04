@@ -1,0 +1,20 @@
+{
+  "concept": "http-cancellation",
+  "patterns": {
+    "post-subresource-cancel": {
+      "description": "POST to an action subresource such as /jobs/{id}/cancel."
+    },
+    "post-action-cancel": {
+      "description": "POST route associated with cancellation wording."
+    },
+    "delete-operation-resource": {
+      "description": "DELETE an operation-like resource to request cancellation."
+    },
+    "patch-state-cancelled": {
+      "description": "PATCH updates operation state to a cancelled value."
+    },
+    "other-cancellation-route": {
+      "description": "Cancellation evidence exists but no known interaction pattern matched."
+    }
+  }
+}

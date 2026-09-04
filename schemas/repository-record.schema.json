@@ -1,0 +1,36 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.invalid/rfc-http-miner/repository-record.schema.json",
+  "title": "RepositoryRecord",
+  "type": "object",
+  "required": [
+    "repo_id",
+    "repository_url",
+    "owner",
+    "name",
+    "commit_hash",
+    "collection_timestamp"
+  ],
+  "properties": {
+    "repo_id": { "type": "string" },
+    "repository_url": { "type": "string" },
+    "owner": { "type": "string" },
+    "name": { "type": "string" },
+    "language": { "type": ["string", "null"] },
+    "framework": { "type": ["string", "null"] },
+    "stars": { "type": ["integer", "null"] },
+    "forks": { "type": ["integer", "null"] },
+    "license": { "type": ["string", "null"] },
+    "last_activity": { "type": ["string", "null"] },
+    "default_branch": { "type": ["string", "null"] },
+    "commit_hash": { "type": ["string", "null"] },
+    "project_category": { "type": ["string", "null"] },
+    "fork_parent": { "type": ["string", "null"] },
+    "probable_template": { "type": ["string", "null"] },
+    "probable_origin": { "type": ["string", "null"] },
+    "vendor": { "type": ["string", "null"] },
+    "collection_timestamp": { "type": "string" },
+    "local_path": { "type": ["string", "null"] }
+  },
+  "additionalProperties": false
+}

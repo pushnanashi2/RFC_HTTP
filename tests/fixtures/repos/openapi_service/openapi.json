@@ -1,0 +1,42 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Fixture Operations API",
+    "version": "1.0.0"
+  },
+  "paths": {
+    "/operations": {
+      "post": {
+        "operationId": "createOperation",
+        "summary": "Start a long running operation",
+        "responses": {
+          "202": {
+            "description": "Operation accepted"
+          }
+        }
+      }
+    },
+    "/operations/{operationId}/status": {
+      "get": {
+        "operationId": "getOperationStatus",
+        "summary": "Get operation progress status",
+        "responses": {
+          "200": {
+            "description": "Current operation status"
+          }
+        }
+      }
+    },
+    "/operations/{operationId}/cancel": {
+      "post": {
+        "operationId": "cancelOperation",
+        "summary": "Cancel operation",
+        "responses": {
+          "202": {
+            "description": "Cancellation accepted"
+          }
+        }
+      }
+    }
+  }
+}

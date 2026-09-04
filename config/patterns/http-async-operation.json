@@ -1,0 +1,23 @@
+{
+  "concept": "http-async-operation",
+  "patterns": {
+    "post-202-accepted": {
+      "description": "POST starts work and returns 202 Accepted."
+    },
+    "post-job-resource": {
+      "description": "POST creates a job/task/operation-like resource."
+    },
+    "get-status-resource": {
+      "description": "GET exposes status or progress for asynchronous work."
+    },
+    "get-operation-resource": {
+      "description": "GET exposes a job/task/operation-like resource."
+    },
+    "mutation-202-accepted": {
+      "description": "PUT/PATCH/DELETE accepts asynchronous mutation work."
+    },
+    "other-async-route": {
+      "description": "Async evidence exists but no known interaction pattern matched."
+    }
+  }
+}

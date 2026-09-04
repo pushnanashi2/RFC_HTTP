@@ -1,0 +1,46 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.invalid/rfc-http-miner/evidence-record.schema.json",
+  "title": "EvidenceRecord",
+  "type": "object",
+  "required": [
+    "repository",
+    "concept",
+    "evidenceType",
+    "httpMethod",
+    "path",
+    "file",
+    "lineStart",
+    "confidence",
+    "extractor",
+    "extractorVersion"
+  ],
+  "properties": {
+    "repository": { "type": "string" },
+    "commit": { "type": ["string", "null"] },
+    "concept": { "type": "string" },
+    "evidenceType": { "type": "string" },
+    "httpMethod": { "type": "string" },
+    "path": { "type": "string" },
+    "responseCodes": {
+      "type": "array",
+      "items": { "type": "integer" }
+    },
+    "file": { "type": "string" },
+    "symbol": { "type": ["string", "null"] },
+    "lineStart": { "type": "integer", "minimum": 1 },
+    "lineEnd": { "type": "integer", "minimum": 1 },
+    "confidence": { "type": "number", "minimum": 0, "maximum": 1 },
+    "extractedValue": { "type": "object" },
+    "extractor": { "type": "string" },
+    "extractorVersion": { "type": "string" },
+    "normalizedPath": { "type": "string" },
+    "pattern": { "type": "string" },
+    "patternReason": { "type": "string" },
+    "normalizationRules": {
+      "type": "array",
+      "items": { "type": "string" }
+    }
+  },
+  "additionalProperties": false
+}

@@ -1,0 +1,165 @@
+from __future__ import annotations
+
+import argparse
+from pathlib import Path
+
+from .clustering import cluster_patterns
+from .collector import collect_repositories
+from .deduplication import dedupe_repositories
+from .extraction import analyze_repositories
+from .normalization import normalize_evidence
+from .paths import data_paths
+from .reporting import write_report
+from .scoring import score_opportunities
+from .standards import compare_standards
+
+
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
+DEFAULT_SEED_REL = Path("config") / "corpus" / "stage1-http.json"
+DEFAULT_STANDARDS_REL = Path("config") / "standards" / "http-api-seed.json"
+
+
+def build_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(prog="rfc-miner")
+    subcommands = parser.add_subparsers(dest="command", required=True)
+
+    collect = subcommands.add_parser("collect", help="collect and pin repositories")
+    add_common(collect)
+    collect.add_argument("--seed", default=str(default_path(DEFAULT_SEED_REL)))
+    collect.add_argument("--repo-dir", default="data/repos")
+    collect.add_argument("--limit", type=int, default=30)
+    collect.add_argument("--no-clone", action="store_true")
+
+    analyze = subcommands.add_parser("analyze", help="extract raw evidence")
+    add_common(analyze)
+    analyze.add_argument("--repositories")
+
+    normalize = subcommands.add_parser("normalize", help="normalize raw evidence")
+    add_common(normalize)
+    normalize.add_argument("--raw-evidence")
+
+    dedupe = subcommands.add_parser("dedupe", help="map repos to independent families")
+    add_common(dedupe)
+    dedupe.add_argument("--repositories")
+    dedupe.add_argument("--normalized-evidence")
+
+    cluster = subcommands.add_parser("cluster", help="cluster normalized patterns")
+    add_common(cluster)
+
+    compare = subcommands.add_parser("compare-standards", help="compare with seeded standards")
+    add_common(compare)
+    compare.add_argument("--standards", default=str(default_path(DEFAULT_STANDARDS_REL)))
+
+    score = subcommands.add_parser("score", help="score opportunities")
+    add_common(score)
+
+    report = subcommands.add_parser("report", help="write Markdown report")
+    add_common(report)
+
+    run = subcommands.add_parser("run", help="run the full pipeline")
+    add_common(run)
+    run.add_argument("--seed", default=str(default_path(DEFAULT_SEED_REL)))
+    run.add_argument("--repo-dir", default="data/repos")
+    run.add_argument("--limit", type=int, default=30)
+    run.add_argument("--repositories")
+    run.add_argument("--standards", default=str(default_path(DEFAULT_STANDARDS_REL)))
+    run.add_argument("--skip-collect", action="store_true")
+    run.add_argument("--no-clone", action="store_true")
+
+    return parser
+
+
+def add_common(parser: argparse.ArgumentParser) -> None:
+    parser.add_argument("--data-dir", default="data")
+
+
+def default_path(relative_path: Path) -> Path:
+    cwd_candidate = Path.cwd() / relative_path
+    if cwd_candidate.exists():
+        return cwd_candidate
+    return PROJECT_ROOT / relative_path
+
+
+def main(argv: list[str] | None = None) -> int:
+    parser = build_parser()
+    args = parser.parse_args(argv)
+    paths = data_paths(args.data_dir)
+
+    if args.command == "collect":
+        records = collect_repositories(
+            seed_path=args.seed,
+            paths=paths,
+            repo_dir=args.repo_dir,
+            limit=args.limit,
+            clone=not args.no_clone,
+        )
+        print(f"collected repositories: {len(records)}")
+        return 0
+
+    if args.command == "analyze":
+        evidence, errors = analyze_repositories(paths=paths, repositories_path=args.repositories)
+        print(f"raw evidence: {len(evidence)}; errors: {len(errors)}")
+        return 0
+
+    if args.command == "normalize":
+        records = normalize_evidence(paths=paths, raw_evidence_path=args.raw_evidence)
+        print(f"normalized evidence: {len(records)}")
+        return 0
+
+    if args.command == "dedupe":
+        families = dedupe_repositories(
+            paths=paths,
+            repositories_path=args.repositories,
+            normalized_evidence_path=args.normalized_evidence,
+        )
+        print(f"families: {len(families)}")
+        return 0
+
+    if args.command == "cluster":
+        clusters = cluster_patterns(paths=paths)
+        print(f"concept clusters: {len(clusters.get('concepts', {}))}")
+        return 0
+
+    if args.command == "compare-standards":
+        comparisons = compare_standards(paths=paths, standards_path=args.standards)
+        print(f"standards comparisons: {len(comparisons.get('concepts', {}))}")
+        return 0
+
+    if args.command == "score":
+        scores = score_opportunities(paths=paths)
+        print(f"opportunity scores: {len(scores.get('scores', []))}")
+        return 0
+
+    if args.command == "report":
+        write_report(paths=paths)
+        print(f"report: {paths.report}")
+        return 0
+
+    if args.command == "run":
+        if not args.skip_collect:
+            collect_repositories(
+                seed_path=args.seed,
+                paths=paths,
+                repo_dir=args.repo_dir,
+                limit=args.limit,
+                clone=not args.no_clone,
+            )
+            repositories_path = None
+        else:
+            repositories_path = args.repositories
+        analyze_repositories(paths=paths, repositories_path=repositories_path)
+        normalize_evidence(paths=paths)
+        dedupe_repositories(paths=paths)
+        cluster_patterns(paths=paths)
+        compare_standards(paths=paths, standards_path=args.standards)
+        score_opportunities(paths=paths)
+        write_report(paths=paths)
+        print(f"report: {paths.report}")
+        return 0
+
+    parser.error(f"unknown command: {args.command}")
+    return 2
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

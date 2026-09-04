@@ -1,0 +1,26 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.invalid/rfc-http-miner/family-record.schema.json",
+  "title": "FamilyRecord",
+  "type": "object",
+  "required": [
+    "repo_id",
+    "family_id",
+    "confidence",
+    "basis",
+    "excluded_from_independent_count"
+  ],
+  "properties": {
+    "repo_id": { "type": "string" },
+    "family_id": { "type": "string" },
+    "confidence": {
+      "type": "string",
+      "enum": ["exact", "probable", "unknown"]
+    },
+    "basis": { "type": "string" },
+    "api_signature": { "type": "string" },
+    "excluded_from_independent_count": { "type": "boolean" },
+    "exclusion_reason": { "type": ["string", "null"] }
+  },
+  "additionalProperties": false
+}

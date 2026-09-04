@@ -1,0 +1,155 @@
+{
+  "description": "Stage-1 HTTP API corpus candidates for async operation and cancellation mining.",
+  "repositories": [
+    {
+      "repository_url": "https://github.com/apache/airflow",
+      "project_category": "workflow-engine",
+      "framework": "flask-fastapi"
+    },
+    {
+      "repository_url": "https://github.com/argoproj/argo-workflows",
+      "project_category": "workflow-engine",
+      "framework": "go-grpc-gateway"
+    },
+    {
+      "repository_url": "https://github.com/argoproj/argo-cd",
+      "project_category": "developer-platform",
+      "framework": "go-grpc-gateway"
+    },
+    {
+      "repository_url": "https://github.com/temporalio/temporal",
+      "project_category": "workflow-engine",
+      "framework": "go"
+    },
+    {
+      "repository_url": "https://github.com/PrefectHQ/prefect",
+      "project_category": "workflow-engine",
+      "framework": "fastapi"
+    },
+    {
+      "repository_url": "https://github.com/dagster-io/dagster",
+      "project_category": "workflow-engine",
+      "framework": "python"
+    },
+    {
+      "repository_url": "https://github.com/kestra-io/kestra",
+      "project_category": "workflow-engine",
+      "framework": "java"
+    },
+    {
+      "repository_url": "https://github.com/n8n-io/n8n",
+      "project_category": "workflow-engine",
+      "framework": "typescript"
+    },
+    {
+      "repository_url": "https://github.com/windmill-labs/windmill",
+      "project_category": "workflow-engine",
+      "framework": "rust-typescript"
+    },
+    {
+      "repository_url": "https://github.com/getsentry/sentry",
+      "project_category": "developer-platform",
+      "framework": "django"
+    },
+    {
+      "repository_url": "https://github.com/go-gitea/gitea",
+      "project_category": "developer-platform",
+      "framework": "go"
+    },
+    {
+      "repository_url": "https://github.com/woodpecker-ci/woodpecker",
+      "project_category": "ci-orchestration",
+      "framework": "go"
+    },
+    {
+      "repository_url": "https://github.com/harness/drone",
+      "project_category": "ci-orchestration",
+      "framework": "go"
+    },
+    {
+      "repository_url": "https://github.com/jenkinsci/jenkins",
+      "project_category": "ci-orchestration",
+      "framework": "java"
+    },
+    {
+      "repository_url": "https://github.com/hashicorp/nomad",
+      "project_category": "scheduler",
+      "framework": "go"
+    },
+    {
+      "repository_url": "https://github.com/openfaas/faas",
+      "project_category": "cloud-native",
+      "framework": "go"
+    },
+    {
+      "repository_url": "https://github.com/grafana/grafana",
+      "project_category": "developer-platform",
+      "framework": "go-typescript"
+    },
+    {
+      "repository_url": "https://github.com/kubernetes/kubernetes",
+      "project_category": "orchestration-engine",
+      "framework": "go"
+    },
+    {
+      "repository_url": "https://github.com/knative/serving",
+      "project_category": "cloud-native",
+      "framework": "go"
+    },
+    {
+      "repository_url": "https://github.com/apache/apisix",
+      "project_category": "api-gateway",
+      "framework": "lua"
+    },
+    {
+      "repository_url": "https://github.com/Kong/kong",
+      "project_category": "api-gateway",
+      "framework": "lua"
+    },
+    {
+      "repository_url": "https://github.com/hasura/graphql-engine",
+      "project_category": "developer-platform",
+      "framework": "haskell"
+    },
+    {
+      "repository_url": "https://github.com/mattermost/mattermost",
+      "project_category": "developer-platform",
+      "framework": "go"
+    },
+    {
+      "repository_url": "https://github.com/RocketChat/Rocket.Chat",
+      "project_category": "developer-platform",
+      "framework": "typescript"
+    },
+    {
+      "repository_url": "https://github.com/nextcloud/server",
+      "project_category": "developer-platform",
+      "framework": "php"
+    },
+    {
+      "repository_url": "https://github.com/zulip/zulip",
+      "project_category": "developer-platform",
+      "framework": "django"
+    },
+    {
+      "repository_url": "https://github.com/apache/pulsar",
+      "project_category": "distributed-system",
+      "framework": "java"
+    },
+    {
+      "repository_url": "https://github.com/elastic/kibana",
+      "project_category": "developer-platform",
+      "framework": "typescript"
+    },
+    {
+      "repository_url": "https://github.com/rundeck/rundeck",
+      "project_category": "job-scheduler",
+      "framework": "java-groovy"
+    },
+    {
+      "repository_url": "https://github.com/Netflix/conductor",
+      "project_category": "workflow-engine",
+      "framework": "java"
+    }
+  ]
+}

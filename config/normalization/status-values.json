@@ -1,0 +1,30 @@
+{
+  "execution_in_progress": [
+    "running",
+    "processing",
+    "in_progress",
+    "active",
+    "pending"
+  ],
+  "execution_completed": [
+    "done",
+    "finished",
+    "completed",
+    "success",
+    "succeeded"
+  ],
+  "execution_failed": [
+    "failed",
+    "error",
+    "errored",
+    "failure"
+  ],
+  "execution_cancelled": [
+    "cancelled",
+    "canceled",
+    "aborted",
+    "stopped",
+    "terminated",
+    "killed"
+  ]
+}
