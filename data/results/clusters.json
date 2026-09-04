@@ -1,0 +1,655 @@
+{
+  "concepts": {
+    "http-async-operation": {
+      "dominantPatternRatio": 0.3261,
+      "entropy": 0.9228,
+      "evidenceCount": 1907,
+      "frameworkDistribution": {
+        "fastapi": 1,
+        "flask-fastapi": 1,
+        "go": 6,
+        "go-grpc-gateway": 2,
+        "go-typescript": 1,
+        "java": 1,
+        "php": 1,
+        "rust-typescript": 1,
+        "typescript": 3
+      },
+      "independentFamilyCount": 17,
+      "languageDistribution": {
+        "Go": 8,
+        "Java": 1,
+        "PHP": 1,
+        "Python": 2,
+        "Rust": 1,
+        "TypeScript": 4
+      },
+      "longTailRatio": 0.0,
+      "numberOfPatterns": 5,
+      "patterns": {
+        "get-operation-resource": {
+          "examples": [
+            {
+              "commit": "b3b62fa8cf3c32cb45bb2815385a2af498300754",
+              "confidence": 0.6,
+              "extractor": "source-routes",
+              "file": "airflow-core/src/airflow/api_fastapi/core_api/routes/ui/partitioned_dag_runs.py",
+              "httpMethod": "GET",
+              "lineStart": 243,
+              "normalizedPath": "/partitioned_dag_runs",
+              "path": "/partitioned_dag_runs",
+              "repository": "apache/airflow"
+            },
+            {
+              "commit": "b3b62fa8cf3c32cb45bb2815385a2af498300754",
+              "confidence": 0.6,
+              "extractor": "source-routes",
+              "file": "airflow-core/src/airflow/api_fastapi/core_api/routes/ui/partitioned_dag_runs.py",
+              "httpMethod": "GET",
+              "lineStart": 356,
+              "normalizedPath": "/pending_partitioned_dag_run/{var}",
+              "path": "/pending_partitioned_dag_run/{dag_id}",
+              "repository": "apache/airflow"
+            },
+            {
+              "commit": "b3b62fa8cf3c32cb45bb2815385a2af498300754",
+              "confidence": 0.6,
+              "extractor": "source-routes",
+              "file": "airflow-core/src/airflow/api_fastapi/core_api/routes/ui/assets.py",
+              "httpMethod": "GET",
+              "lineStart": 143,
+              "normalizedPath": "/next_run_assets/{var}",
+              "path": "/next_run_assets/{dag_id}",
+              "repository": "apache/airflow"
+            },
+            {
+              "commit": "b3b62fa8cf3c32cb45bb2815385a2af498300754",
+              "confidence": 0.6,
+              "extractor": "source-routes",
+              "file": "airflow-core/src/airflow/api_fastapi/execution_api/routes/task_reschedules.py",
+              "httpMethod": "GET",
+              "lineStart": 42,
+              "normalizedPath": "/{var}/start_date",
+              "path": "/{task_instance_id}/start_date",
+              "repository": "apache/airflow"
+            },
+            {
+              "commit": "b3b62fa8cf3c32cb45bb2815385a2af498300754",
+              "confidence": 0.6,
+              "extractor": "source-routes",
+              "file": "airflow-core/src/airflow/api_fastapi/execution_api/routes/xcoms.py",
+              "httpMethod": "GET",
+              "lineStart": 136,
+              "normalizedPath": "/{var}/{var}/{var}/{var}}/item/{var}",
+              "path": "/{dag_id}/{run_id}/{task_id}/{key:path}/item/{offset}",
+              "repository": "apache/airflow"
+            }
+          ],
+          "familyCount": 15,
+          "repositoryCount": 15
+        },
+        "get-status-resource": {
+          "examples": [
+            {
+              "commit": "b3b62fa8cf3c32cb45bb2815385a2af498300754",
+              "confidence": 0.78,
+              "extractor": "source-routes",
+              "file": "airflow-core/src/airflow/api_fastapi/core_api/routes/public/tasks.py",
+              "httpMethod": "GET",
+              "lineStart": 95,
+              "normalizedPath": "/{var}",
+              "path": "/{task_id}",
+              "repository": "apache/airflow"
+            },
+            {
+              "commit": "b3b62fa8cf3c32cb45bb2815385a2af498300754",
+              "confidence": 0.78,
+              "extractor": "source-routes",
+              "file": "airflow-core/src/airflow/api_fastapi/core_api/routes/public/dag_run.py",
+              "httpMethod": "GET",
+              "lineStart": 132,
+              "normalizedPath": "/{var}",
+              "path": "/{dag_run_id}",
+              "repository": "apache/airflow"
+            },
+            {
+              "commit": "b3b62fa8cf3c32cb45bb2815385a2af498300754",
+              "confidence": 0.78,
+              "extractor": "source-routes",
+              "file": "airflow-core/src/airflow/api_fastapi/core_api/routes/public/dag_run.py",
+              "httpMethod": "GET",
+              "lineStart": 270,
+              "normalizedPath": "/{var}/upstreamAssetEvents",
+              "path": "/{dag_run_id}/upstreamAssetEvents",
+              "repository": "apache/airflow"
+            },
+            {
+              "commit": "b3b62fa8cf3c32cb45bb2815385a2af498300754",
+              "confidence": 0.78,
+              "extractor": "source-routes",
+              "file": "airflow-core/src/airflow/api_fastapi/core_api/routes/public/dag_run.py",
+              "httpMethod": "GET",
+              "lineStart": 845,
+              "normalizedPath": "/{var}/wait",
+              "path": "/{dag_run_id}/wait",
+              "repository": "apache/airflow"
+            },
+            {
+              "commit": "b3b62fa8cf3c32cb45bb2815385a2af498300754",
+              "confidence": 0.78,
+              "extractor": "source-routes",
+              "file": "airflow-core/src/airflow/api_fastapi/core_api/routes/public/log.py",
+              "httpMethod": "GET",
+              "lineStart": 79,
+              "normalizedPath": "/{var}/logs/{var}",
+              "path": "/{task_id}/logs/{try_number}",
+              "repository": "apache/airflow"
+            }
+          ],
+          "familyCount": 5,
+          "repositoryCount": 5
+        },
+        "mutation-202-accepted": {
+          "examples": [
+            {
+              "commit": "486175075d96269ea8a528f2018ea4329d249cc2",
+              "confidence": 0.84,
+              "extractor": "source-routes",
+              "file": "src/prefect/server/api/automations.py",
+              "httpMethod": "DELETE",
+              "lineStart": 239,
+              "normalizedPath": "/owned-by/{var}}",
+              "path": "/owned-by/{resource_id:str}",
+              "repository": "PrefectHQ/prefect"
+            },
+            {
+              "commit": "231ee19cff64e0872247c8ac4e45176bb918bc3f",
+              "confidence": 0.92,
+              "extractor": "openapi",
+              "file": "templates/swagger/v1-swagger.generated.json",
+              "httpMethod": "DELETE",
+              "lineStart": 4429,
+              "normalizedPath": "/orgs/{var}/repos",
+              "path": "/orgs/{org}/repos",
+              "repository": "go-gitea/gitea"
+            },
+            {
+              "commit": "231ee19cff64e0872247c8ac4e45176bb918bc3f",
+              "confidence": 0.92,
+              "extractor": "openapi",
+              "file": "templates/swagger/v1-openapi3.generated.json",
+              "httpMethod": "DELETE",
+              "lineStart": 15664,
+              "normalizedPath": "/orgs/{var}/repos",
+              "path": "/orgs/{org}/repos",
+              "repository": "go-gitea/gitea"
+            },
+            {
+              "commit": "4a508887aaeb21f05eb0374e565edea973ed1364",
+              "confidence": 0.92,
+              "extractor": "openapi",
+              "file": "pkg/services/ngalert/api/tooling/api.json",
+              "httpMethod": "DELETE",
+              "lineStart": 5800,
+              "normalizedPath": "/convert/api/prom/rules/{var}",
+              "path": "/convert/api/prom/rules/{NamespaceTitle}",
+              "repository": "grafana/grafana"
+            },
+            {
+              "commit": "4a508887aaeb21f05eb0374e565edea973ed1364",
+              "confidence": 0.92,
+              "extractor": "openapi",
+              "file": "pkg/services/ngalert/api/tooling/api.json",
+              "httpMethod": "DELETE",
+              "lineStart": 5946,
+              "normalizedPath": "/convert/api/prom/rules/{var}/{var}",
+              "path": "/convert/api/prom/rules/{NamespaceTitle}/{Group}",
+              "repository": "grafana/grafana"
+            }
+          ],
+          "familyCount": 4,
+          "repositoryCount": 4
+        },
+        "post-202-accepted": {
+          "examples": [
+            {
+              "commit": "b3b62fa8cf3c32cb45bb2815385a2af498300754",
+              "confidence": 0.84,
+              "extractor": "source-routes",
+              "file": "airflow-core/src/airflow/api_fastapi/core_api/routes/public/connections.py",
+              "httpMethod": "POST",
+              "lineStart": 383,
+              "normalizedPath": "/enqueue-test",
+              "path": "/enqueue-test",
+              "repository": "apache/airflow"
+            },
+            {
+              "commit": "fda7b3f086619e3716e5894c07be127104174f1d",
+              "confidence": 0.92,
+              "extractor": "openapi-yaml-lite",
+              "file": "backend/windmill-api/openapi.yaml",
+              "httpMethod": "POST",
+              "lineStart": 1804,
+              "normalizedPath": "/settings/object_storage_usage",
+              "path": "/settings/object_storage_usage",
+              "repository": "windmill-labs/windmill"
+            },
+            {
+              "commit": "fda7b3f086619e3716e5894c07be127104174f1d",
+              "confidence": 0.92,
+              "extractor": "openapi-yaml-lite",
+              "file": "backend/windmill-api/openapi.yaml",
+              "httpMethod": "POST",
+              "lineStart": 1818,
+              "normalizedPath": "/settings/run_log_cleanup",
+              "path": "/settings/run_log_cleanup",
+              "repository": "windmill-labs/windmill"
+            },
+            {
+              "commit": "fda7b3f086619e3716e5894c07be127104174f1d",
+              "confidence": 0.92,
+              "extractor": "openapi-yaml-lite",
+              "file": "backend/windmill-api/openapi.yaml",
+              "httpMethod": "POST",
+              "lineStart": 1948,
+              "normalizedPath": "/settings/audit_logs_s3_backfill",
+              "path": "/settings/audit_logs_s3_backfill",
+              "repository": "windmill-labs/windmill"
+            },
+            {
+              "commit": "fda7b3f086619e3716e5894c07be127104174f1d",
+              "confidence": 0.92,
+              "extractor": "openapi",
+              "file": "backend/windmill-api/openapi-deref.json",
+              "httpMethod": "POST",
+              "lineStart": 2450,
+              "normalizedPath": "/settings/object_storage_usage",
+              "path": "/settings/object_storage_usage",
+              "repository": "windmill-labs/windmill"
+            }
+          ],
+          "familyCount": 8,
+          "repositoryCount": 8
+        },
+        "post-job-resource": {
+          "examples": [
+            {
+              "commit": "b3b62fa8cf3c32cb45bb2815385a2af498300754",
+              "confidence": 0.7,
+              "extractor": "source-routes",
+              "file": "airflow-core/src/airflow/api_fastapi/core_api/routes/public/dag_run.py",
+              "httpMethod": "POST",
+              "lineStart": 309,
+              "normalizedPath": "/{var}/clear",
+              "path": "/{dag_run_id}/clear",
+              "repository": "apache/airflow"
+            },
+            {
+              "commit": "b3b62fa8cf3c32cb45bb2815385a2af498300754",
+              "confidence": 0.7,
+              "extractor": "source-routes",
+              "file": "airflow-core/src/airflow/api_fastapi/core_api/routes/public/task_instances.py",
+              "httpMethod": "POST",
+              "lineStart": 850,
+              "normalizedPath": "/clearTaskInstances",
+              "path": "/clearTaskInstances",
+              "repository": "apache/airflow"
+            },
+            {
+              "commit": "b3b62fa8cf3c32cb45bb2815385a2af498300754",
+              "confidence": 0.7,
+              "extractor": "source-routes",
+              "file": "airflow-core/src/airflow/api_fastapi/execution_api/routes/dag_runs.py",
+              "httpMethod": "POST",
+              "lineStart": 85,
+              "normalizedPath": "/{var}/{var}",
+              "path": "/{dag_id}/{run_id}",
+              "repository": "apache/airflow"
+            },
+            {
+              "commit": "b3b62fa8cf3c32cb45bb2815385a2af498300754",
+              "confidence": 0.7,
+              "extractor": "source-routes",
+              "file": "airflow-core/src/airflow/api_fastapi/execution_api/routes/dag_runs.py",
+              "httpMethod": "POST",
+              "lineStart": 176,
+              "normalizedPath": "/{var}/{var}/clear",
+              "path": "/{dag_id}/{run_id}/clear",
+              "repository": "apache/airflow"
+            },
+            {
+              "commit": "b3b62fa8cf3c32cb45bb2815385a2af498300754",
+              "confidence": 0.7,
+              "extractor": "source-routes",
+              "file": "airflow-core/src/airflow/api_fastapi/execution_api/routes/xcoms.py",
+              "httpMethod": "POST",
+              "lineStart": 361,
+              "normalizedPath": "/{var}/{var}/{var}/{var}}",
+              "path": "/{dag_id}/{run_id}/{task_id}/{key:path}",
+              "repository": "apache/airflow"
+            }
+          ],
+          "familyCount": 14,
+          "repositoryCount": 14
+        }
+      },
+      "repositoryCount": 17,
+      "vendorDistribution": {
+        "Netflix": 1,
+        "PrefectHQ": 1,
+        "RocketChat": 1,
+        "apache": 1,
+        "argoproj": 2,
+        "elastic": 1,
+        "go-gitea": 1,
+        "grafana": 1,
+        "harness": 1,
+        "hashicorp": 1,
+        "kubernetes": 1,
+        "n8n-io": 1,
+        "nextcloud": 1,
+        "openfaas": 1,
+        "windmill-labs": 1,
+        "woodpecker-ci": 1
+      }
+    },
+    "http-cancellation": {
+      "dominantPatternRatio": 0.4167,
+      "entropy": 0.7812,
+      "evidenceCount": 138,
+      "frameworkDistribution": {
+        "fastapi": 1,
+        "flask-fastapi": 1,
+        "go": 5,
+        "go-grpc-gateway": 2,
+        "go-typescript": 1,
+        "java": 1,
+        "php": 1,
+        "rust-typescript": 1,
+        "typescript": 2
+      },
+      "independentFamilyCount": 15,
+      "languageDistribution": {
+        "Go": 7,
+        "Java": 1,
+        "PHP": 1,
+        "Python": 2,
+        "Rust": 1,
+        "TypeScript": 3
+      },
+      "longTailRatio": 0.4,
+      "numberOfPatterns": 5,
+      "patterns": {
+        "delete-operation-resource": {
+          "examples": [
+            {
+              "commit": "b3b62fa8cf3c32cb45bb2815385a2af498300754",
+              "confidence": 0.56,
+              "extractor": "source-routes",
+              "file": "airflow-core/src/airflow/api_fastapi/core_api/routes/public/dag_run.py",
+              "httpMethod": "DELETE",
+              "lineStart": 155,
+              "normalizedPath": "/{var}",
+              "path": "/{dag_run_id}",
+              "repository": "apache/airflow"
+            },
+            {
+              "commit": "b3b62fa8cf3c32cb45bb2815385a2af498300754",
+              "confidence": 0.56,
+              "extractor": "source-routes",
+              "file": "airflow-core/src/airflow/api_fastapi/execution_api/routes/task_state_store.py",
+              "httpMethod": "DELETE",
+              "lineStart": 93,
+              "normalizedPath": "/{var}/{var}}",
+              "path": "/{task_instance_id}/{key:path}",
+              "repository": "apache/airflow"
+            },
+            {
+              "commit": "b3b62fa8cf3c32cb45bb2815385a2af498300754",
+              "confidence": 0.56,
+              "extractor": "source-routes",
+              "file": "airflow-core/src/airflow/api_fastapi/execution_api/routes/task_state_store.py",
+              "httpMethod": "DELETE",
+              "lineStart": 104,
+              "normalizedPath": "/{var}",
+              "path": "/{task_instance_id}",
+              "repository": "apache/airflow"
+            },
+            {
+              "commit": "b3b62fa8cf3c32cb45bb2815385a2af498300754",
+              "confidence": 0.56,
+              "extractor": "source-routes",
+              "file": "airflow-core/src/airflow/api_fastapi/execution_api/routes/xcoms.py",
+              "httpMethod": "DELETE",
+              "lineStart": 462,
+              "normalizedPath": "/{var}/{var}/{var}/{var}}",
+              "path": "/{dag_id}/{run_id}/{task_id}/{key:path}",
+              "repository": "apache/airflow"
+            },
+            {
+              "commit": "34427a68b08f46f0bd43846213a2aaf24452cbd6",
+              "confidence": 0.96,
+              "extractor": "openapi",
+              "file": "assets/swagger.json",
+              "httpMethod": "DELETE",
+              "lineStart": 1075,
+              "normalizedPath": "/api/v1/applications/{var}/operation",
+              "path": "/api/v1/applications/{name}/operation",
+              "repository": "argoproj/argo-cd"
+            }
+          ],
+          "familyCount": 10,
+          "repositoryCount": 10
+        },
+        "get-cancel-link": {
+          "examples": [
+            {
+              "commit": "fda7b3f086619e3716e5894c07be127104174f1d",
+              "confidence": 0.82,
+              "extractor": "openapi-yaml-lite",
+              "file": "backend/windmill-api/openapi.yaml",
+              "httpMethod": "GET",
+              "lineStart": 16657,
+              "normalizedPath": "/w/{var}/jobs_u/cancel/{var}/{var}/{var}",
+              "path": "/w/{workspace}/jobs_u/cancel/{id}/{resume_id}/{signature}",
+              "repository": "windmill-labs/windmill"
+            },
+            {
+              "commit": "fda7b3f086619e3716e5894c07be127104174f1d",
+              "confidence": 0.82,
+              "extractor": "openapi",
+              "file": "backend/windmill-api/openapi-deref.json",
+              "httpMethod": "GET",
+              "lineStart": 22130,
+              "normalizedPath": "/w/{var}/jobs_u/cancel/{var}/{var}/{var}",
+              "path": "/w/{workspace}/jobs_u/cancel/{id}/{resume_id}/{signature}",
+              "repository": "windmill-labs/windmill"
+            },
+            {
+              "commit": "fda7b3f086619e3716e5894c07be127104174f1d",
+              "confidence": 0.82,
+              "extractor": "openapi-yaml-lite",
+              "file": "backend/windmill-api/openapi-deref.yaml",
+              "httpMethod": "GET",
+              "lineStart": 22969,
+              "normalizedPath": "/w/{var}/jobs_u/cancel/{var}/{var}/{var}",
+              "path": "/w/{workspace}/jobs_u/cancel/{id}/{resume_id}/{signature}",
+              "repository": "windmill-labs/windmill"
+            }
+          ],
+          "familyCount": 1,
+          "repositoryCount": 1
+        },
+        "post-action-cancel": {
+          "examples": [
+            {
+              "commit": "fda7b3f086619e3716e5894c07be127104174f1d",
+              "confidence": 0.96,
+              "extractor": "openapi-yaml-lite",
+              "file": "backend/windmill-api/openapi.yaml",
+              "httpMethod": "POST",
+              "lineStart": 14750,
+              "normalizedPath": "/w/{var}/jobs/queue/cancel_selection",
+              "path": "/w/{workspace}/jobs/queue/cancel_selection",
+              "repository": "windmill-labs/windmill"
+            },
+            {
+              "commit": "fda7b3f086619e3716e5894c07be127104174f1d",
+              "confidence": 0.96,
+              "extractor": "openapi-yaml-lite",
+              "file": "backend/windmill-api/openapi.yaml",
+              "httpMethod": "POST",
+              "lineStart": 14848,
+              "normalizedPath": "/w/{var}/trigger/{var}/cancel_suspended_trigger_jobs/{var}",
+              "path": "/w/{workspace}/trigger/{trigger_kind}/cancel_suspended_trigger_jobs/{trigger_path}",
+              "repository": "windmill-labs/windmill"
+            },
+            {
+              "commit": "fda7b3f086619e3716e5894c07be127104174f1d",
+              "confidence": 0.96,
+              "extractor": "openapi-yaml-lite",
+              "file": "backend/windmill-api/openapi.yaml",
+              "httpMethod": "POST",
+              "lineStart": 16045,
+              "normalizedPath": "/w/{var}/jobs_u/queue/cancel/{var}",
+              "path": "/w/{workspace}/jobs_u/queue/cancel/{id}",
+              "repository": "windmill-labs/windmill"
+            },
+            {
+              "commit": "fda7b3f086619e3716e5894c07be127104174f1d",
+              "confidence": 0.96,
+              "extractor": "openapi-yaml-lite",
+              "file": "backend/windmill-api/openapi.yaml",
+              "httpMethod": "POST",
+              "lineStart": 16073,
+              "normalizedPath": "/w/{var}/jobs_u/queue/cancel_persistent/{var}",
+              "path": "/w/{workspace}/jobs_u/queue/cancel_persistent/{path}",
+              "repository": "windmill-labs/windmill"
+            },
+            {
+              "commit": "fda7b3f086619e3716e5894c07be127104174f1d",
+              "confidence": 0.96,
+              "extractor": "openapi-yaml-lite",
+              "file": "backend/windmill-api/openapi.yaml",
+              "httpMethod": "POST",
+              "lineStart": 16101,
+              "normalizedPath": "/w/{var}/jobs_u/queue/force_cancel/{var}",
+              "path": "/w/{workspace}/jobs_u/queue/force_cancel/{id}",
+              "repository": "windmill-labs/windmill"
+            }
+          ],
+          "familyCount": 3,
+          "repositoryCount": 3
+        },
+        "post-subresource-cancel": {
+          "examples": [
+            {
+              "commit": "fcabdcae3ce313e7c8645d56684bb7c4217b199c",
+              "confidence": 0.96,
+              "extractor": "openapi-yaml-lite",
+              "file": "packages/cli/src/public-api/v1/openapi.decorator-routes.generated.yml",
+              "httpMethod": "POST",
+              "lineStart": 20,
+              "normalizedPath": "/executions/stop",
+              "path": "/executions/stop",
+              "repository": "n8n-io/n8n"
+            },
+            {
+              "commit": "fcabdcae3ce313e7c8645d56684bb7c4217b199c",
+              "confidence": 0.96,
+              "extractor": "openapi-yaml-lite",
+              "file": "packages/cli/src/public-api/v1/openapi.decorator-routes.generated.yml",
+              "httpMethod": "POST",
+              "lineStart": 23,
+              "normalizedPath": "/executions/{var}/stop",
+              "path": "/executions/{executionId}/stop",
+              "repository": "n8n-io/n8n"
+            },
+            {
+              "commit": "fcabdcae3ce313e7c8645d56684bb7c4217b199c",
+              "confidence": 0.88,
+              "extractor": "source-routes",
+              "file": "packages/testing/playwright/services/workflow-api-helper.ts",
+              "httpMethod": "POST",
+              "lineStart": 411,
+              "normalizedPath": "/rest/executions/${var}/stop",
+              "path": "/rest/executions/${executionId}/stop",
+              "repository": "n8n-io/n8n"
+            },
+            {
+              "commit": "fcabdcae3ce313e7c8645d56684bb7c4217b199c",
+              "confidence": 0.88,
+              "extractor": "source-routes",
+              "file": "packages/testing/playwright/services/api-helper.ts",
+              "httpMethod": "POST",
+              "lineStart": 509,
+              "normalizedPath": "/rest/instance-ai/chat/${var}/tasks/${var}/cancel",
+              "path": "/rest/instance-ai/chat/${threadId}/tasks/${taskId}/cancel",
+              "repository": "n8n-io/n8n"
+            },
+            {
+              "commit": "fcabdcae3ce313e7c8645d56684bb7c4217b199c",
+              "confidence": 0.88,
+              "extractor": "source-routes",
+              "file": "packages/cli/src/evaluation.ee/test-runs.controller.ee.ts",
+              "httpMethod": "POST",
+              "lineStart": 161,
+              "normalizedPath": "/{var}/test-runs/{var}/cancel",
+              "path": "/:workflowId/test-runs/:id/cancel",
+              "repository": "n8n-io/n8n"
+            }
+          ],
+          "familyCount": 9,
+          "repositoryCount": 9
+        },
+        "put-action-cancel": {
+          "examples": [
+            {
+              "commit": "35bff19146f5a6ada77468c431f2624bd577e373",
+              "confidence": 0.82,
+              "extractor": "openapi",
+              "file": "api/openapi-spec/swagger.json",
+              "httpMethod": "PUT",
+              "lineStart": 3790,
+              "normalizedPath": "/api/v1/workflows/{var}/{var}/stop",
+              "path": "/api/v1/workflows/{namespace}/{name}/stop",
+              "repository": "argoproj/argo-workflows"
+            },
+            {
+              "commit": "35bff19146f5a6ada77468c431f2624bd577e373",
+              "confidence": 0.82,
+              "extractor": "openapi",
+              "file": "api/openapi-spec/swagger.json",
+              "httpMethod": "PUT",
+              "lineStart": 3878,
+              "normalizedPath": "/api/v1/workflows/{var}/{var}/terminate",
+              "path": "/api/v1/workflows/{namespace}/{name}/terminate",
+              "repository": "argoproj/argo-workflows"
+            }
+          ],
+          "familyCount": 1,
+          "repositoryCount": 1
+        }
+      },
+      "repositoryCount": 15,
+      "vendorDistribution": {
+        "Netflix": 1,
+        "PrefectHQ": 1,
+        "RocketChat": 1,
+        "apache": 1,
+        "argoproj": 2,
+        "go-gitea": 1,
+        "grafana": 1,
+        "harness": 1,
+        "hashicorp": 1,
+        "kubernetes": 1,
+        "n8n-io": 1,
+        "nextcloud": 1,
+        "windmill-labs": 1,
+        "woodpecker-ci": 1
+      }
+    }
+  },
+  "independentFamilyCount": 30,
+  "rawRepositoryCount": 30
+}

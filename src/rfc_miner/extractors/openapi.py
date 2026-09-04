@@ -30,7 +30,8 @@ def extract_openapi(repo: dict[str, Any], repo_root: str | Path) -> list[dict[st
 def iter_openapi_files(root: Path) -> Iterable[Path]:
     ignored = {".git", "node_modules", "vendor", "dist", "build", ".venv", "venv"}
     for path in root.rglob("*"):
-        if any(part in ignored for part in path.parts):
+        relative_parts = path.relative_to(root).parts
+        if any(part in ignored for part in relative_parts):
             continue
         if not path.is_file():
             continue
@@ -65,6 +66,7 @@ def extract_openapi_json(repo: dict[str, Any], root: Path, path: Path) -> list[d
                 path=route_path,
                 response_codes=response_codes,
                 operation_text=operation_text,
+                operation_name=operation.get("operationId"),
             ):
                 records.append(
                     evidence_record(
@@ -113,6 +115,7 @@ def extract_openapi_yaml(repo: dict[str, Any], root: Path, path: Path) -> list[d
             path=current_path,
             response_codes=codes,
             operation_text=operation_text,
+            operation_name=operation.get("operationId"),
         ):
             records.append(
                 evidence_record(

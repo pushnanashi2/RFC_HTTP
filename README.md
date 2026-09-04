@@ -49,8 +49,9 @@ python3 -m unittest discover -s tests -v
 
 ## Run the stage-1 corpus
 
-This clones shallow, commit-pinned copies into `data/repos` and writes a
-machine-readable repository inventory.
+The default `run` mode clones one repository at a time, pins its commit,
+extracts evidence, and removes the checkout after analysis. Pass `--keep-repos`
+when you want to keep shallow copies in `data/repos` for debugging.
 
 ```bash
 rfc-miner run \

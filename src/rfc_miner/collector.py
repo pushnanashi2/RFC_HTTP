@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import os
 import re
+import shutil
 import subprocess
 import urllib.error
 import urllib.request
@@ -10,7 +11,7 @@ from pathlib import Path
 from typing import Any
 
 from .io import write_jsonl
-from .models import repository_record
+from .models import error_record, repository_record
 from .paths import DataPaths, ensure_data_dirs
 
 
@@ -98,6 +99,7 @@ def collect_repositories(
         seed = seed[:limit]
 
     records: list[dict[str, Any]] = []
+    errors: list[dict[str, Any]] = []
     for item in seed:
         owner = str(item["owner"])
         name = str(item["name"])
@@ -109,11 +111,25 @@ def collect_repositories(
 
         if clone and not local_path:
             destination = repo_root / f"{owner}__{name}"
-            clone_or_update(repository_url, destination)
-            local_path = str(destination)
-            commit_hash = git_output(["git", "rev-parse", "HEAD"], cwd=destination)
-            if not default_branch:
-                default_branch = default_branch_from_checkout(destination)
+            try:
+                clone_or_update(repository_url, destination)
+                local_path = str(destination)
+                commit_hash = git_output(["git", "rev-parse", "HEAD"], cwd=destination)
+                if not default_branch:
+                    default_branch = default_branch_from_checkout(destination)
+            except subprocess.CalledProcessError as error:
+                errors.append(
+                    error_record(
+                        repo=f"{owner}/{name}",
+                        stage="collect",
+                        error_type="git_clone_failed",
+                        error=command_error_message(error),
+                        retryable=True,
+                    )
+                )
+                if destination.exists():
+                    shutil.rmtree(destination)
+                local_path = None
 
         license_value = metadata.get("license")
         license_name = None
@@ -147,6 +163,7 @@ def collect_repositories(
         )
 
     write_jsonl(paths.repositories, records)
+    write_jsonl(paths.errors, errors)
     return records
 
 
@@ -155,6 +172,8 @@ def clone_or_update(repository_url: str, destination: Path) -> None:
         git_output(["git", "fetch", "--depth", "1", "origin"], cwd=destination)
         git_output(["git", "checkout", "--detach", "FETCH_HEAD"], cwd=destination)
         return
+    if destination.exists():
+        shutil.rmtree(destination)
     subprocess.run(
         ["git", "clone", "--depth", "1", repository_url, str(destination)],
         check=True,
@@ -174,6 +193,14 @@ def git_output(command: list[str], cwd: str | Path) -> str:
         text=True,
     )
     return result.stdout.strip()
+
+
+def command_error_message(error: subprocess.CalledProcessError) -> str:
+    command = " ".join(str(part) for part in error.cmd)
+    stderr = (error.stderr or "").strip()
+    stdout = (error.stdout or "").strip()
+    message = stderr or stdout or f"exit code {error.returncode}"
+    return f"{command}: {message}"
 
 
 def default_branch_from_checkout(path: Path) -> str | None:

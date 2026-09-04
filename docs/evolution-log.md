@@ -21,3 +21,33 @@ This log records why extraction and analysis logic changes over time.
 - expected effect: Adjacent handlers no longer leak cancellation/status terms into unrelated routes.
 - actual effect: Pending rerun.
 - regression added: Existing fixture pipeline asserts the expected cancellation and async patterns after context narrowing.
+
+## 2026-09-04 — Streaming corpus run mode
+
+- problem: Stage-1 execution could fill the local disk because `run` collected all repository checkouts before analysis.
+- observed failure: A 30-repository run exhausted available disk space and a single clone failure stopped the full corpus.
+- root cause: Collection and analysis were separated inside the one-shot `run` command, so large shallow clones accumulated before evidence extraction.
+- change: Added streaming collection/analyze mode for `run`, plus clone-error capture and cleanup of partial checkouts.
+- expected effect: Real corpus runs continue across individual clone failures and keep only one checkout on disk by default.
+- actual effect: A 30-repository Stage-1 run completed with zero extraction errors while leaving `data/repos` empty after checkout cleanup.
+- regression added: Existing CLI fixture pipeline exercises the streaming-compatible downstream stages; real corpus run will validate cleanup behavior.
+
+## 2026-09-04 — Stage-1 false-positive reduction
+
+- problem: The first 30-repository run included test, mock, and fixture route calls as implementation evidence and treated some GET/DELETE routes too broadly as cancellation or async operation evidence.
+- observed failure: Airflow unit tests, UI mock handlers, and generic workflow deletion routes appeared in cancellation and async-operation aggregates.
+- root cause: Source-route extraction scanned test-like directories, GET async classification used context-only nouns, and DELETE cancellation accepted broad async nouns such as workflow.
+- change: Source-route extraction now ignores relative test/mock/fixture/example/doc directories, tokenization handles camelCase route terms, GET async requires an async noun in the path, and DELETE cancellation is restricted to operation-instance nouns.
+- expected effect: Stage-1 prevalence remains evidence-backed while reducing test/mock pollution and workflow-definition false positives.
+- actual effect: Stage-1 evidence dropped from 6,093 noisy records to 2,124 async-operation and 159 cancellation records before the strong-cancellation refinement.
+- regression added: Fixture source-route test verifies routes under a relative `tests/` directory are ignored.
+
+## 2026-09-04 — Strong cancellation evidence
+
+- problem: Cancellation detection still accepted weak cancellation words from broad operation text and left common PUT/GET cancellation forms as `other-cancellation-route`.
+- observed failure: Generic routes with cancellation wording in surrounding text could be classified, while Argo `PUT /workflows/{name}/stop` and Windmill signed GET cancel links lacked specific patterns.
+- root cause: The classifier did not distinguish strong path or operation-name evidence from incidental text evidence, and pattern definitions lacked PUT/GET cancellation forms.
+- change: Cancellation now requires a cancellation word in the path or operation/handler name, POST async classification ignores query/list/count paths without stronger evidence, and cancellation patterns include `put-action-cancel` and `get-cancel-link`.
+- expected effect: Fewer incidental cancellation false positives and more informative clustering of non-POST cancellation variants.
+- actual effect: The final 30-repository Stage-1 run produced 1,907 async-operation records, 138 cancellation records, zero `other-*` pattern buckets, and zero extraction errors.
+- regression added: Tests cover GET incidental cancellation text rejection and PUT stop-route pattern assignment.

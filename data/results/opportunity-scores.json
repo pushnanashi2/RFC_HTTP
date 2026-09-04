@@ -1,0 +1,65 @@
+{
+  "independentFamilyCount": 30,
+  "rawRepositoryCount": 30,
+  "scores": [
+    {
+      "bestStandardsCoverage": "partial",
+      "components": {
+        "implementationDivergence": 18,
+        "independentImplementations": 17,
+        "interoperabilityValue": 13,
+        "prevalence": 11,
+        "specificationTractability": 4,
+        "standardsCorrectness": 4,
+        "standardsGap": 8
+      },
+      "concept": "http-async-operation",
+      "counterarguments": [
+        "Stage-1 extraction may undercount dynamic framework routes.",
+        "OpenAPI-documented APIs may not represent internal server practice.",
+        "An implementation guide or profile may be more appropriate than a new RFC."
+      ],
+      "independentFamilyCount": 17,
+      "patternCount": 5,
+      "rawRepositoryCount": 17,
+      "score": 75,
+      "whyHigh": [
+        "Observed across multiple independent implementation families.",
+        "Multiple interaction patterns indicate real implementation divergence.",
+        "Asynchronous operations shape polling, progress, result, and retry behavior."
+      ],
+      "whyLow": [
+        "Seeded standards already cover part of the concept."
+      ]
+    },
+    {
+      "bestStandardsCoverage": "adjacent",
+      "components": {
+        "implementationDivergence": 16,
+        "independentImplementations": 15,
+        "interoperabilityValue": 12,
+        "prevalence": 10,
+        "specificationTractability": 5,
+        "standardsCorrectness": 4,
+        "standardsGap": 12
+      },
+      "concept": "http-cancellation",
+      "counterarguments": [
+        "Stage-1 extraction may undercount dynamic framework routes.",
+        "OpenAPI-documented APIs may not represent internal server practice.",
+        "Cancellation semantics may depend on domain-specific safety guarantees."
+      ],
+      "independentFamilyCount": 15,
+      "patternCount": 5,
+      "rawRepositoryCount": 15,
+      "score": 74,
+      "whyHigh": [
+        "Observed across multiple independent implementation families.",
+        "Multiple interaction patterns indicate real implementation divergence.",
+        "Existing seeded standards do not fully cover the observed concept.",
+        "Cancellation affects client interoperability and safe operation lifecycle handling."
+      ],
+      "whyLow": []
+    }
+  ]
+}

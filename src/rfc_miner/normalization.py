@@ -62,6 +62,10 @@ def assign_pattern(record: dict[str, Any], normalized_path: str) -> tuple[str, s
     if concept == "http-cancellation":
         if method == "POST" and re.search(r"/(?:cancel|abort|stop|terminate|kill)$", normalized_path.lower()):
             return "post-subresource-cancel", "POST action subresource ending in a cancellation verb"
+        if method == "PUT" and re.search(r"/(?:cancel|abort|stop|terminate|kill)$", normalized_path.lower()):
+            return "put-action-cancel", "PUT action subresource ending in a cancellation verb"
+        if method == "GET" and re.search(r"/(?:cancel|abort|stop|terminate|kill)(?:/|$)", normalized_path.lower()):
+            return "get-cancel-link", "GET cancellation link or signed action URL"
         if method == "POST" and has_cancel_word(combined_text):
             return "post-action-cancel", "POST route associated with cancellation wording"
         if method == "DELETE" and has_async_noun(combined_text):

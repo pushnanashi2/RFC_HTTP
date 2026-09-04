@@ -7,6 +7,12 @@
     "post-action-cancel": {
       "description": "POST route associated with cancellation wording."
     },
+    "put-action-cancel": {
+      "description": "PUT to an action subresource such as /workflows/{id}/stop."
+    },
+    "get-cancel-link": {
+      "description": "GET cancellation link or signed action URL."
+    },
     "delete-operation-resource": {
       "description": "DELETE an operation-like resource to request cancellation."
     },

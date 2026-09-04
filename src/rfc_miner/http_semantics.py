@@ -5,6 +5,10 @@ from typing import Any
 
 
 ASYNC_NOUNS = {
+    "allocation",
+    "allocations",
+    "backfill",
+    "backfills",
     "job",
     "jobs",
     "operation",
@@ -21,6 +25,31 @@ ASYNC_NOUNS = {
     "builds",
     "deployment",
     "deployments",
+    "pipeline",
+    "pipelines",
+    "dagrun",
+    "dagruns",
+}
+
+CANCELABLE_RESOURCE_NOUNS = {
+    "allocation",
+    "allocations",
+    "backfill",
+    "backfills",
+    "build",
+    "builds",
+    "deployment",
+    "deployments",
+    "execution",
+    "executions",
+    "job",
+    "jobs",
+    "operation",
+    "operations",
+    "run",
+    "runs",
+    "task",
+    "tasks",
 }
 
 CANCEL_WORDS = {
@@ -61,19 +90,29 @@ def classify_route(
     path: str,
     response_codes: list[int] | None = None,
     operation_text: str = "",
+    operation_name: str | None = None,
 ) -> list[dict[str, Any]]:
     method = method.upper()
     codes = set(response_codes or [])
     path_lower = path.lower()
     combined = f"{path_lower} {operation_text.lower()}"
-    segments = set(re.split(r"[^a-z0-9]+", combined))
+    segments = tokens(combined)
+    path_segments = tokens(path_lower)
+    name_segments = tokens(operation_name or "")
     concepts: list[dict[str, Any]] = []
 
     cancel_hit = bool(segments & CANCEL_WORDS)
     async_hit = bool(segments & ASYNC_NOUNS)
     status_hit = bool(segments & STATUS_WORDS)
+    cancel_in_path = bool(path_segments & CANCEL_WORDS)
+    cancel_in_name = bool(name_segments & CANCEL_WORDS)
+    async_in_path = bool(path_segments & ASYNC_NOUNS)
+    async_in_name = bool(name_segments & ASYNC_NOUNS)
+    status_in_path = bool(path_segments & STATUS_WORDS)
+    query_action_in_path = bool(path_segments & {"count", "filter", "list", "paginate", "search", "history"})
+    strong_cancel_hit = cancel_in_path or cancel_in_name
 
-    if cancel_hit and async_hit:
+    if strong_cancel_hit and async_hit and (method in {"POST", "PUT", "PATCH", "DELETE"} or cancel_in_path):
         concepts.append(
             {
                 "concept": "http-cancellation",
@@ -81,7 +120,7 @@ def classify_route(
                 "reason": "cancel-word-with-async-resource",
             }
         )
-    elif cancel_hit:
+    elif strong_cancel_hit and method in {"POST", "PUT", "PATCH", "DELETE"}:
         concepts.append(
             {
                 "concept": "http-cancellation",
@@ -89,7 +128,7 @@ def classify_route(
                 "reason": "cancel-word",
             }
         )
-    elif method == "DELETE" and async_hit:
+    elif method == "DELETE" and bool(path_segments & CANCELABLE_RESOURCE_NOUNS):
         concepts.append(
             {
                 "concept": "http-cancellation",
@@ -106,7 +145,7 @@ def classify_route(
                 "reason": "accepted-response",
             }
         )
-    elif async_hit and method == "POST":
+    elif async_hit and method == "POST" and not query_action_in_path and (async_in_path or async_in_name or 202 in codes):
         concepts.append(
             {
                 "concept": "http-async-operation",
@@ -114,7 +153,7 @@ def classify_route(
                 "reason": "post-async-resource",
             }
         )
-    elif async_hit and method == "GET" and status_hit:
+    elif method == "GET" and async_in_path and (status_hit or status_in_path):
         concepts.append(
             {
                 "concept": "http-async-operation",
@@ -122,7 +161,7 @@ def classify_route(
                 "reason": "status-resource",
             }
         )
-    elif async_hit and method == "GET":
+    elif method == "GET" and async_in_path:
         concepts.append(
             {
                 "concept": "http-async-operation",
@@ -135,15 +174,17 @@ def classify_route(
 
 
 def has_async_noun(value: str) -> bool:
-    segments = set(re.split(r"[^a-z0-9]+", value.lower()))
-    return bool(segments & ASYNC_NOUNS)
+    return bool(tokens(value) & ASYNC_NOUNS)
 
 
 def has_cancel_word(value: str) -> bool:
-    segments = set(re.split(r"[^a-z0-9]+", value.lower()))
-    return bool(segments & CANCEL_WORDS)
+    return bool(tokens(value) & CANCEL_WORDS)
 
 
 def has_status_word(value: str) -> bool:
-    segments = set(re.split(r"[^a-z0-9]+", value.lower()))
-    return bool(segments & STATUS_WORDS)
+    return bool(tokens(value) & STATUS_WORDS)
+
+
+def tokens(value: str) -> set[str]:
+    separated = re.sub(r"([a-z0-9])([A-Z])", r"\1 \2", value)
+    return {segment for segment in re.split(r"[^a-z0-9]+", separated.lower()) if segment}

@@ -12,6 +12,7 @@ from .paths import data_paths
 from .reporting import write_report
 from .scoring import score_opportunities
 from .standards import compare_standards
+from .streaming import collect_and_analyze_streaming
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
@@ -65,6 +66,7 @@ def build_parser() -> argparse.ArgumentParser:
     run.add_argument("--standards", default=str(default_path(DEFAULT_STANDARDS_REL)))
     run.add_argument("--skip-collect", action="store_true")
     run.add_argument("--no-clone", action="store_true")
+    run.add_argument("--keep-repos", action="store_true")
 
     return parser
 
@@ -137,17 +139,27 @@ def main(argv: list[str] | None = None) -> int:
 
     if args.command == "run":
         if not args.skip_collect:
-            collect_repositories(
-                seed_path=args.seed,
-                paths=paths,
-                repo_dir=args.repo_dir,
-                limit=args.limit,
-                clone=not args.no_clone,
-            )
+            if args.no_clone:
+                collect_repositories(
+                    seed_path=args.seed,
+                    paths=paths,
+                    repo_dir=args.repo_dir,
+                    limit=args.limit,
+                    clone=False,
+                )
+                analyze_repositories(paths=paths)
+            else:
+                collect_and_analyze_streaming(
+                    seed_path=args.seed,
+                    paths=paths,
+                    repo_dir=args.repo_dir,
+                    limit=args.limit,
+                    keep_repos=args.keep_repos,
+                )
             repositories_path = None
         else:
             repositories_path = args.repositories
-        analyze_repositories(paths=paths, repositories_path=repositories_path)
+            analyze_repositories(paths=paths, repositories_path=repositories_path)
         normalize_evidence(paths=paths)
         dedupe_repositories(paths=paths)
         cluster_patterns(paths=paths)

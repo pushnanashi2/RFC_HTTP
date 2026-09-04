@@ -24,6 +24,11 @@ Each stage reads and writes files under `data/` by default. The CLI accepts
 alternate paths so tests and experiments can run without touching production
 data.
 
+`run` uses a streaming collector/analyzer by default: it clones one repository,
+pins the commit, extracts evidence, writes intermediate artifacts, and removes
+the checkout unless `--keep-repos` is passed. This keeps the Stage-1 corpus
+workable on small disks while preserving reproducible commit hashes.
+
 ## Modules
 
 - `rfc_miner.collector`: seed-based GitHub repository collection and commit

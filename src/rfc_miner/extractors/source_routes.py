@@ -38,6 +38,19 @@ IGNORED_DIRS = {
     "venv",
     "__pycache__",
     "target",
+    "test",
+    "tests",
+    "__tests__",
+    "spec",
+    "specs",
+    "mock",
+    "mocks",
+    "fixture",
+    "fixtures",
+    "example",
+    "examples",
+    "doc",
+    "docs",
 }
 
 MAX_FILE_BYTES = 1_000_000
@@ -151,6 +164,7 @@ def extract_source_routes(repo: dict[str, Any], repo_root: str | Path) -> list[d
                     path=route_path,
                     response_codes=response_codes,
                     operation_text=operation_text,
+                    operation_name=symbol,
                 ):
                     key = (relative_path(root, path), line, method, route_path, concept["concept"])
                     if key in seen:
@@ -182,7 +196,8 @@ def extract_source_routes(repo: dict[str, Any], repo_root: str | Path) -> list[d
 
 def iter_source_files(root: Path) -> Iterable[Path]:
     for path in root.rglob("*"):
-        if any(part in IGNORED_DIRS for part in path.parts):
+        relative_parts = path.relative_to(root).parts
+        if any(part in IGNORED_DIRS for part in relative_parts):
             continue
         if not path.is_file() or path.suffix.lower() not in SOURCE_SUFFIXES:
             continue
