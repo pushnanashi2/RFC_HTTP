@@ -59,6 +59,13 @@ def cancellation_linkage_metrics(
             pattern: freeze_totals(metrics)
             for pattern, metrics in sorted(pattern_totals.items())
         },
+        "operationResourceLinked": operation_resource_linked_metrics(
+            strict_totals=strict_totals,
+            delete_operation_totals=pattern_totals.get(
+                "delete-operation-resource",
+                new_totals(),
+            ),
+        ),
     }
 
 
@@ -227,4 +234,21 @@ def freeze_totals(totals: dict[str, Any]) -> dict[str, int]:
         "domainTransitionRiskRepositoryCount": len(totals["domainTransitionRiskRepositories"]),
         "domainTransitionRiskFamilyCount": len(totals["domainTransitionRiskFamilies"]),
         "domainTransitionRiskEvidenceCount": int(totals["domainTransitionRiskEvidenceCount"]),
+    }
+
+
+def operation_resource_linked_metrics(
+    *,
+    strict_totals: dict[str, Any],
+    delete_operation_totals: dict[str, Any],
+) -> dict[str, int]:
+    strict_linked_families = set(strict_totals["routeLevelOperationLinkedFamilies"])
+    delete_linked_families = set(delete_operation_totals["routeLevelOperationLinkedFamilies"])
+    union_families = strict_linked_families | delete_linked_families
+    intersection_families = strict_linked_families & delete_linked_families
+    return {
+        "strictLinkedFamilyCount": len(strict_linked_families),
+        "deleteOperationLinkedFamilyCount": len(delete_linked_families),
+        "strictAndDeleteOperationLinkedFamilyCount": len(intersection_families),
+        "strictOrDeleteOperationLinkedFamilyCount": len(union_families),
     }

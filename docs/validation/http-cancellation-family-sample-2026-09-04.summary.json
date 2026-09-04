@@ -1,10 +1,10 @@
 {
   "analysisWeight": "2.907143",
   "byLinkageBucket": {
-    "domain-transition-risk": 70,
-    "mixed-operation-target-and-risk": 6,
+    "domain-transition-risk": 69,
+    "mixed-operation-target-and-risk": 5,
     "mixed-same-resource-and-risk": 31,
-    "operation-like-target": 2,
+    "operation-like-target": 4,
     "same-resource-linked": 31
   },
   "byStrictFamilyPatternMembershipCount": {

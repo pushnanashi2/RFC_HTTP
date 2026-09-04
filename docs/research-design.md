@@ -203,6 +203,8 @@ Initial references include:
 
 - HTTP Semantics (`RFC 9110`)
 - Web Linking (`RFC 8288`)
+- Link-Template (`RFC 9652`)
+- Linkset (`RFC 9264`)
 - Prefer Header for HTTP (`RFC 7240`)
 - Problem Details (`RFC 9457`)
 - HTTP Idempotency-Key Internet-Draft
@@ -255,7 +257,8 @@ Cancellation reports therefore compute route-level operation linkage:
   repository;
 - operation-like target: the cancel target contains an operation-like noun such
   as job, task, operation, run, execution, workflow, build, deployment, or
-  pipeline;
+  pipeline, export, import, backup, restore, sync, scan, render, transcode,
+  training, migration, index, provision, snapshot, report, or query;
 - domain-transition risk: a strict cancellation route that has neither of the
   previous properties.
 

@@ -37,7 +37,8 @@
       "title": "Web Linking",
       "url": "https://www.rfc-editor.org/rfc/rfc8288.html",
       "concepts": [
-        "http-async-operation"
+        "http-async-operation",
+        "http-cancellation"
       ],
       "confidence": 0.8,
       "conceptCoverage": {
@@ -49,6 +50,76 @@
             "Link header"
           ],
           "confidence": 0.75
+        },
+        "http-cancellation": {
+          "coverage": "adjacent",
+          "gap": "Can express a typed link to a cancel affordance, but does not define cancellation lifecycle semantics.",
+          "conflict": "none",
+          "evidence": [
+            "Link header",
+            "link relation"
+          ],
+          "confidence": 0.75
+        }
+      }
+    },
+    {
+      "id": "RFC9652",
+      "title": "The Link-Template HTTP Header Field",
+      "url": "https://www.rfc-editor.org/rfc/rfc9652.html",
+      "concepts": [
+        "http-async-operation",
+        "http-cancellation"
+      ],
+      "confidence": 0.8,
+      "conceptCoverage": {
+        "http-async-operation": {
+          "coverage": "adjacent",
+          "gap": "Can advertise templated operation/status/result links, but does not define operation lifecycle semantics.",
+          "conflict": "none",
+          "evidence": [
+            "Link-Template"
+          ],
+          "confidence": 0.75
+        },
+        "http-cancellation": {
+          "coverage": "adjacent",
+          "gap": "Can advertise templated cancel affordance URIs, but does not define cancellation request or terminal-state semantics.",
+          "conflict": "none",
+          "evidence": [
+            "Link-Template"
+          ],
+          "confidence": 0.75
+        }
+      }
+    },
+    {
+      "id": "RFC9264",
+      "title": "Linkset: Media Types and a Link Relation Type for Link Sets",
+      "url": "https://www.rfc-editor.org/rfc/rfc9264.html",
+      "concepts": [
+        "http-async-operation",
+        "http-cancellation"
+      ],
+      "confidence": 0.7,
+      "conceptCoverage": {
+        "http-async-operation": {
+          "coverage": "adjacent",
+          "gap": "Can publish grouped operation affordance links, but does not define operation lifecycle semantics.",
+          "conflict": "none",
+          "evidence": [
+            "linkset"
+          ],
+          "confidence": 0.7
+        },
+        "http-cancellation": {
+          "coverage": "adjacent",
+          "gap": "Can publish grouped cancel affordance links, but does not define cancellation lifecycle semantics.",
+          "conflict": "none",
+          "evidence": [
+            "linkset"
+          ],
+          "confidence": 0.7
         }
       }
     },
@@ -107,13 +178,23 @@
       "title": "The Idempotency-Key HTTP Header Field",
       "url": "https://datatracker.ietf.org/doc/draft-ietf-httpapi-idempotency-key-header/",
       "concepts": [
-        "http-async-operation"
+        "http-async-operation",
+        "http-cancellation"
       ],
       "confidence": 0.7,
       "conceptCoverage": {
         "http-async-operation": {
           "coverage": "adjacent",
           "gap": "Helps retry non-idempotent creation requests, but does not define async operation lifecycle, status, or cancellation patterns.",
+          "conflict": "none",
+          "evidence": [
+            "Idempotency-Key"
+          ],
+          "confidence": 0.7
+        },
+        "http-cancellation": {
+          "coverage": "adjacent",
+          "gap": "Helps retry cancellation requests safely, but does not define cancellation lifecycle or operation terminal states.",
           "conflict": "none",
           "evidence": [
             "Idempotency-Key"

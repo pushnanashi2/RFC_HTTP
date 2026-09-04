@@ -31,7 +31,11 @@ from rfc_miner.models import error_record
 from rfc_miner.normalization import normalize_evidence, normalize_path, normalize_record
 from rfc_miner.paths import data_paths
 from rfc_miner.reporting import write_report
-from rfc_miner.sampling import write_cancellation_family_sample, write_cancellation_sample
+from rfc_miner.sampling import (
+    write_cancellation_family_sample,
+    write_cancellation_route_sample,
+    write_cancellation_sample,
+)
 from rfc_miner.scoring import score_opportunities
 from rfc_miner.standards import compare_standards
 from rfc_miner.streaming import collect_and_analyze_streaming
@@ -237,6 +241,13 @@ class PipelineTests(unittest.TestCase):
         )
         self.assertTrue(any(record["concept"] == "http-cancellation" for record in stop_route))
 
+        export_cancel = classify_route(
+            method="POST",
+            path="/exports/{id}/cancel",
+            operation_name="cancelExport",
+        )
+        self.assertTrue(any(record["concept"] == "http-cancellation" for record in export_cancel))
+
         normalized = normalize_record(
             {
                 "concept": "http-cancellation",
@@ -410,6 +421,21 @@ class PipelineTests(unittest.TestCase):
                         "extractor": "openapi",
                     },
                     {
+                        "repository": "example/ops",
+                        "commit": "abc123",
+                        "concept": "http-cancellation",
+                        "evidenceType": "route",
+                        "httpMethod": "DELETE",
+                        "path": "/jobs/{id}",
+                        "responseCodes": [202],
+                        "file": "openapi.yaml",
+                        "lineStart": 3,
+                        "lineEnd": 3,
+                        "confidence": 0.64,
+                        "extractedValue": {},
+                        "extractor": "openapi",
+                    },
+                    {
                         "repository": "example/domain",
                         "commit": "def456",
                         "concept": "http-async-operation",
@@ -446,11 +472,18 @@ class PipelineTests(unittest.TestCase):
             dedupe_repositories(paths=paths)
             clusters = cluster_patterns(paths=paths)
             linkage = clusters["concepts"]["http-cancellation"]["operationLinkage"]["strict"]
+            operation_resource = clusters["concepts"]["http-cancellation"]["operationLinkage"][
+                "operationResourceLinked"
+            ]
 
             self.assertEqual(linkage["familyCount"], 2)
             self.assertEqual(linkage["routeLevelOperationLinkedFamilyCount"], 1)
             self.assertEqual(linkage["operationTargetFamilyCount"], 1)
             self.assertEqual(linkage["domainTransitionRiskFamilyCount"], 1)
+            self.assertEqual(operation_resource["strictLinkedFamilyCount"], 1)
+            self.assertEqual(operation_resource["deleteOperationLinkedFamilyCount"], 1)
+            self.assertEqual(operation_resource["strictAndDeleteOperationLinkedFamilyCount"], 1)
+            self.assertEqual(operation_resource["strictOrDeleteOperationLinkedFamilyCount"], 1)
 
     def test_cancellation_sample_sheet_uses_linkage_buckets(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
@@ -555,6 +588,21 @@ class PipelineTests(unittest.TestCase):
             summary = json.loads(output.with_suffix(".summary.json").read_text(encoding="utf-8"))
             self.assertTrue(summary["estimationGuidance"]["doNotPoolRawRows"])
             self.assertEqual(summary["samplingUnit"], "family-pattern-representative")
+
+            route_output, route_count = write_cancellation_route_sample(paths=paths, profile="minimum", seed=1)
+            with route_output.open("r", encoding="utf-8", newline="") as handle:
+                route_rows = list(csv.DictReader(handle))
+
+            self.assertEqual(route_count, 3)
+            self.assertEqual({row["samplingUnit"] for row in route_rows}, {"route-record"})
+            self.assertEqual({row["estimationPopulation"] for row in route_rows}, {"route-cancellation-record"})
+            self.assertEqual(
+                {row["routeStratum"] for row in route_rows},
+                {"post-subresource-cancel:linked", "post-subresource-cancel:unlinked"},
+            )
+            route_summary = json.loads(route_output.with_suffix(".summary.json").read_text(encoding="utf-8"))
+            self.assertEqual(route_summary["samplingUnit"], "route-record")
+            self.assertIn("blindLabeling", route_summary["estimationGuidance"])
 
     def test_cancellation_family_sample_uses_unique_families(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:

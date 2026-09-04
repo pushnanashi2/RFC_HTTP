@@ -1,0 +1,44 @@
+{
+  "byPattern": {
+    "delete-action-cancel": 39,
+    "delete-operation-resource": 100,
+    "get-cancel-link": 33,
+    "patch-state-cancelled": 8,
+    "post-action-cancel": 50,
+    "post-subresource-cancel": 100,
+    "put-action-cancel": 47
+  },
+  "byRouteLevelLinkage": {
+    "linked": 174,
+    "unlinked": 203
+  },
+  "byRouteStratum": {
+    "delete-action-cancel:any": 39,
+    "delete-operation-resource:any": 100,
+    "get-cancel-link:any": 33,
+    "patch-state-cancelled:any": 8,
+    "post-action-cancel:any": 50,
+    "post-subresource-cancel:linked": 30,
+    "post-subresource-cancel:unlinked": 70,
+    "put-action-cancel:any": 47
+  },
+  "estimationGuidance": {
+    "blindLabeling": "Hide routeStratum and automated linkage columns from human labelers; use them only for sampling weights and post-label analysis.",
+    "deleteOperationResource": "Sampled at higher density because it determines the operation-resource linked envelope around the cancellation candidate.",
+    "primaryEstimate": "Compute stratum rates and a route-record weighted estimate using routeFramePopulationRecords. Route strata are exclusive for this sheet.",
+    "purpose": "Use this sheet for route-record operation-vs-domain cancellation precision. Do not use it to update unique-family denominator claims."
+  },
+  "estimationPopulation": "route-cancellation-record",
+  "populationRouteRecordsByStratum": {
+    "delete-action-cancel:any": 39,
+    "delete-operation-resource:any": 468,
+    "get-cancel-link:any": 33,
+    "patch-state-cancelled:any": 8,
+    "post-action-cancel:any": 189,
+    "post-subresource-cancel:linked": 257,
+    "post-subresource-cancel:unlinked": 617,
+    "put-action-cancel:any": 47
+  },
+  "sampleCount": 377,
+  "samplingUnit": "route-record"
+}

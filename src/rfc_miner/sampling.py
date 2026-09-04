@@ -26,6 +26,17 @@ FULL_SAMPLE_SIZES = {
     "delete-operation-resource": 50,
 }
 
+FULL_ROUTE_SAMPLE_SIZES: dict[str, int | None] = {
+    "delete-operation-resource:any": 100,
+    "post-subresource-cancel:linked": 30,
+    "post-subresource-cancel:unlinked": 70,
+    "post-action-cancel:any": 50,
+    "delete-action-cancel:any": None,
+    "put-action-cancel:any": None,
+    "get-cancel-link:any": None,
+    "patch-state-cancelled:any": None,
+}
+
 MINIMUM_SAMPLE_SIZES = {
     "post-subresource-cancel": 50,
     "post-action-cancel": 30,
@@ -36,7 +47,19 @@ MINIMUM_SAMPLE_SIZES = {
     "delete-operation-resource": 10,
 }
 
+MINIMUM_ROUTE_SAMPLE_SIZES: dict[str, int | None] = {
+    "delete-operation-resource:any": 25,
+    "post-subresource-cancel:linked": 15,
+    "post-subresource-cancel:unlinked": 35,
+    "post-action-cancel:any": 30,
+    "delete-action-cancel:any": 20,
+    "put-action-cancel:any": 15,
+    "get-cancel-link:any": 10,
+    "patch-state-cancelled:any": None,
+}
+
 PATTERN_ORDER = tuple(FULL_SAMPLE_SIZES)
+ROUTE_STRATUM_ORDER = tuple(FULL_ROUTE_SAMPLE_SIZES)
 STRICT_PATTERN_ORDER = tuple(pattern for pattern in PATTERN_ORDER if pattern != "delete-operation-resource")
 STRICT_FAMILY_SAMPLE_SIZES = {
     "full": 140,
@@ -137,6 +160,43 @@ FAMILY_SAMPLE_COLUMNS = [
     "adjudicatedLabel",
 ]
 
+ROUTE_SAMPLE_COLUMNS = [
+    "sample_id",
+    "samplingUnit",
+    "estimationPopulation",
+    "routeStratum",
+    "routeFramePopulationRecords",
+    "routeStratumSampleSize",
+    "routeStratumSamplingFraction",
+    "routeStratumAnalysisWeight",
+    "family_id",
+    "repository",
+    "pattern",
+    "httpMethod",
+    "normalizedPath",
+    "path",
+    "sourceKind",
+    "file",
+    "lineStart",
+    "commit",
+    "symbol",
+    "responseCodes",
+    "confidence",
+    "cancelTargetPath",
+    "routeLevelOperationLinked",
+    "operationTarget",
+    "domainTransitionRisk",
+    "adjacentOperationEvidence",
+    "terminalStateEvidence",
+    "responseSemanticsEvidence",
+    "primaryLabel",
+    "secondaryFlags",
+    "reviewerConfidence",
+    "rationale",
+    "reviewer",
+    "adjudicatedLabel",
+]
+
 
 def write_cancellation_sample(
     *,
@@ -192,6 +252,37 @@ def write_cancellation_family_sample(
     write_json(
         target.with_suffix(".summary.json"),
         family_sample_summary(rows),
+    )
+    return target, len(rows)
+
+
+def write_cancellation_route_sample(
+    *,
+    paths: DataPaths,
+    output_path: str | Path | None = None,
+    profile: str = "full",
+    seed: int = 20260904,
+) -> tuple[Path, int]:
+    ensure_data_dirs(paths)
+    evidence = read_jsonl(paths.normalized_evidence)
+    families = read_jsonl(paths.families)
+    family_by_repo = {str(record.get("repo_id") or ""): record for record in families}
+    rows = build_cancellation_route_sample_records(
+        evidence=evidence,
+        family_by_repo=family_by_repo,
+        profile=profile,
+        seed=seed,
+    )
+
+    target = (
+        Path(output_path)
+        if output_path
+        else paths.results_dir / "validation" / "http-cancellation-route-sample.csv"
+    )
+    write_csv(target, rows, columns=ROUTE_SAMPLE_COLUMNS)
+    write_json(
+        target.with_suffix(".summary.json"),
+        route_sample_summary(rows),
     )
     return target, len(rows)
 
@@ -261,6 +352,74 @@ def build_cancellation_sample_records(
     return selected
 
 
+def build_cancellation_route_sample_records(
+    *,
+    evidence: list[dict[str, Any]],
+    family_by_repo: dict[str, dict[str, Any]],
+    profile: str = "full",
+    seed: int = 20260904,
+) -> list[dict[str, str]]:
+    sample_sizes = route_sample_size_profile(profile)
+    async_paths_by_repo = async_operation_paths_by_repo(
+        evidence=evidence,
+        family_by_repo=family_by_repo,
+    )
+    async_index = async_evidence_index(
+        evidence=evidence,
+        family_by_repo=family_by_repo,
+    )
+    rows_by_stratum: dict[str, list[dict[str, str]]] = defaultdict(list)
+
+    for record in evidence:
+        if str(record.get("concept") or "") != "http-cancellation":
+            continue
+        pattern = str(record.get("pattern") or "")
+        repo_id = str(record.get("repository") or "")
+        family_id = included_family_id(repo_id, family_by_repo)
+        if family_id is None:
+            continue
+        linkage = cancellation_record_linkage(
+            record=record,
+            async_paths_by_repo=async_paths_by_repo,
+        )
+        stratum = route_sample_stratum(pattern=pattern, linkage=linkage)
+        if stratum not in sample_sizes:
+            continue
+        row = sample_row(
+            record=record,
+            family_id=family_id,
+            linkage=linkage,
+            adjacent_records=async_index.get((repo_id, linkage["cancelTargetPath"]), []),
+        )
+        row.update(
+            {
+                "samplingUnit": "route-record",
+                "estimationPopulation": "route-cancellation-record",
+                "routeStratum": stratum,
+                "routeFramePopulationRecords": "",
+                "routeStratumSampleSize": "",
+                "routeStratumSamplingFraction": "",
+                "routeStratumAnalysisWeight": "",
+            }
+        )
+        rows_by_stratum[stratum].append(row)
+
+    selected: list[dict[str, str]] = []
+    for stratum in ROUTE_STRATUM_ORDER:
+        selected.extend(
+            select_route_stratum_rows(
+                stratum=stratum,
+                rows=rows_by_stratum.get(stratum, []),
+                target_size=sample_sizes[stratum],
+                seed=seed,
+            )
+        )
+
+    for index, row in enumerate(selected, start=1):
+        row["sample_id"] = f"cancel-route-{index:04d}"
+    return selected
+
+
 def build_cancellation_family_sample_records(
     *,
     evidence: list[dict[str, Any]],
@@ -323,6 +482,14 @@ def sample_size_profile(profile: str) -> dict[str, int]:
     if profile == "minimum":
         return dict(MINIMUM_SAMPLE_SIZES)
     raise ValueError(f"unknown cancellation sample profile: {profile}")
+
+
+def route_sample_size_profile(profile: str) -> dict[str, int | None]:
+    if profile == "full":
+        return dict(FULL_ROUTE_SAMPLE_SIZES)
+    if profile == "minimum":
+        return dict(MINIMUM_ROUTE_SAMPLE_SIZES)
+    raise ValueError(f"unknown cancellation route sample profile: {profile}")
 
 
 def strict_family_sample_size(profile: str) -> int:
@@ -562,6 +729,31 @@ def next_allowed_row(
     return None
 
 
+def select_route_stratum_rows(
+    *,
+    stratum: str,
+    rows: list[dict[str, str]],
+    target_size: int | None,
+    seed: int,
+) -> list[dict[str, str]]:
+    population_count = len(rows)
+    if population_count == 0:
+        return []
+    target_count = population_count if target_size is None else min(target_size, population_count)
+    candidates = sorted(rows, key=route_sample_key)
+    rng = random.Random(f"{seed}:route-record:{stratum}")
+    rng.shuffle(candidates)
+    selected = candidates[:target_count]
+    for row in selected:
+        row["routeFramePopulationRecords"] = str(population_count)
+        row["routeStratumSampleSize"] = str(target_count)
+        row["routeStratumSamplingFraction"] = format_ratio(target_count, population_count)
+        row["routeStratumAnalysisWeight"] = format_float(
+            population_count / target_count if target_count else 0.0
+        )
+    return selected
+
+
 def sample_row(
     *,
     record: dict[str, Any],
@@ -659,12 +851,29 @@ def estimation_population(pattern: str) -> str:
     return "strict-cancellation"
 
 
+def route_sample_stratum(*, pattern: str, linkage: dict[str, Any]) -> str:
+    if pattern == "post-subresource-cancel":
+        suffix = "linked" if linkage.get("routeLevelOperationLinked") else "unlinked"
+        return f"{pattern}:{suffix}"
+    return f"{pattern}:any"
+
+
 def row_quality_key(row: dict[str, str]) -> tuple[int, int, int, float, str, int]:
     return (
         0 if row["routeLevelOperationLinked"] == "true" else 1,
         0 if row["sourceKind"] == "source" else 1,
         0 if "202" in row["responseCodes"].split(",") else 1,
         -safe_float(row["confidence"]),
+        row["file"],
+        safe_int(row["lineStart"]),
+    )
+
+
+def route_sample_key(row: dict[str, str]) -> tuple[str, str, str, str, int]:
+    return (
+        row["repository"],
+        row["pattern"],
+        row["normalizedPath"],
         row["file"],
         safe_int(row["lineStart"]),
     )
@@ -800,6 +1009,43 @@ def family_sample_summary(rows: list[dict[str, str]]) -> dict[str, Any]:
             "mixedFamilies": (
                 "Inspect strictFamilyCancellationEvidence because a family can contain both "
                 "operation cancellation and business cancellation routes."
+            ),
+        },
+    }
+
+
+def route_sample_summary(rows: list[dict[str, str]]) -> dict[str, Any]:
+    by_stratum = Counter(row["routeStratum"] for row in rows)
+    by_pattern = Counter(row["pattern"] for row in rows)
+    by_linkage = Counter("linked" if row["routeLevelOperationLinked"] == "true" else "unlinked" for row in rows)
+    population_by_stratum = {
+        stratum: safe_int(next(row["routeFramePopulationRecords"] for row in rows if row["routeStratum"] == stratum))
+        for stratum in by_stratum
+    }
+    return {
+        "samplingUnit": "route-record",
+        "estimationPopulation": "route-cancellation-record",
+        "sampleCount": len(rows),
+        "byRouteStratum": dict(sorted(by_stratum.items())),
+        "byPattern": dict(sorted(by_pattern.items())),
+        "byRouteLevelLinkage": dict(sorted(by_linkage.items())),
+        "populationRouteRecordsByStratum": dict(sorted(population_by_stratum.items())),
+        "estimationGuidance": {
+            "purpose": (
+                "Use this sheet for route-record operation-vs-domain cancellation precision. "
+                "Do not use it to update unique-family denominator claims."
+            ),
+            "primaryEstimate": (
+                "Compute stratum rates and a route-record weighted estimate using "
+                "routeFramePopulationRecords. Route strata are exclusive for this sheet."
+            ),
+            "blindLabeling": (
+                "Hide routeStratum and automated linkage columns from human labelers; "
+                "use them only for sampling weights and post-label analysis."
+            ),
+            "deleteOperationResource": (
+                "Sampled at higher density because it determines the operation-resource "
+                "linked envelope around the cancellation candidate."
             ),
         },
     }

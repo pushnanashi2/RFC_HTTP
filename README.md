@@ -123,6 +123,7 @@ seed is written.
 - `data/results/report.md` — human-readable stage report with raw and deduplicated evidence counts
 - `data/results/candidates/http-cancellation.md` — cancellation candidate report, including route-level operation linkage
 - `data/results/manual-review.md` — TP/FP/FN validation checklist
+- `data/results/validation/http-cancellation-route-sample.csv` — route-record cancellation labeling sheet
 - `data/results/validation/http-cancellation-sample.csv` — stratified family-pattern cancellation labeling sheet
 - `data/results/validation/http-cancellation-family-sample.csv` — strict-family cancellation labeling sheet
 
@@ -148,16 +149,29 @@ routes such as `POST /subscriptions/{id}/cancel` can match the same shape as
 operation cancellation. Use the route-level operation-linkage metrics and the
 sampling protocol before making Internet-Draft prevalence claims.
 
-The cancellation sample sheet uses one family-pattern representative per row.
-Do not publish a raw pooled TP rate from the sheet: report per-pattern rates and
-a strict pattern-family weighted estimate, with `delete-operation-resource`
-handled as a separate promotion audit.
+The route-record cancellation sample sheet is the primary sheet for one
+operation-vs-domain TP estimate because its strata are exclusive. Hide automated
+linkage columns during human labeling, then use route-frame weights for the
+route-record estimate.
+
+The family-pattern sample sheet is supporting evidence. Do not publish a raw
+pooled TP rate from it: report per-pattern rates and a strict pattern-family
+weighted estimate, with `delete-operation-resource` handled as a separate
+promotion audit.
 
 Use the strict-family sample sheet for claims over the 407 strict cancellation
-families. The pattern-family sheet estimates the 517 membership frame, not the
-407 unique-family denominator.
+families. The route-record and pattern-family sheets do not update the 407
+unique-family denominator.
 
-Generate the cancellation sample sheet with:
+Generate the route-record cancellation sample sheet with:
+
+```bash
+rfc-miner sample-cancellation-routes \
+  --data-dir /mnt/cash-data/rfc-http-miner/data-5000-refined \
+  --profile full
+```
+
+Generate the family-pattern cancellation sample sheet with:
 
 ```bash
 rfc-miner sample-cancellation \
@@ -180,6 +194,7 @@ rfc-miner sample-cancellation-family \
 - `docs/evolution-log.md`
 - `docs/prior-art/http-cancellation.md`
 - `docs/validation/http-cancellation-sampling-protocol.md`
+- `docs/validation/http-cancellation-route-sample-2026-09-04.csv`
 - `docs/validation/http-cancellation-sample-2026-09-04.csv`
 - `docs/validation/http-cancellation-family-sample-2026-09-04.csv`
 - `docs/drafts/http-operation-cancellation-outline.md`

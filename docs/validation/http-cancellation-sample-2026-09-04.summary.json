@@ -4,12 +4,12 @@
     "strict-cancellation": 210
   },
   "byLinkageBucket": {
-    "domain-transition-risk": 80,
-    "mixed-operation-target-and-risk": 14,
-    "mixed-same-resource-and-risk": 34,
-    "operation-like-target": 33,
+    "domain-transition-risk": 77,
+    "mixed-operation-target-and-risk": 18,
+    "mixed-same-resource-and-risk": 32,
+    "operation-like-target": 38,
     "other": 7,
-    "same-resource-linked": 92
+    "same-resource-linked": 88
   },
   "byPattern": {
     "delete-action-cancel": 30,

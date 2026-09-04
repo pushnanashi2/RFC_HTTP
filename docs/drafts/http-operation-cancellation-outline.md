@@ -26,6 +26,9 @@ operation resource, status monitor, or equivalent observable operation handle.
 - The gap is not endpoint naming. The gap is shared semantics:
   cancelability advertisement, accepted-but-not-complete responses,
   too-late-to-cancel responses, final-state observation, and retry behavior.
+- The main interoperability beneficiary is a generic or autonomous client that
+  needs to stop an operation it started without hard-coded knowledge of each
+  service's cancellation route names.
 
 ## 3. Scope
 
@@ -70,6 +73,8 @@ the cancellation affordance to justify specifying that slice first.
 Candidate mechanisms to discuss:
 
 - link relation from operation/status representation to cancel target;
+- `Link-Template` advertisement for templated cancel targets;
+- linkset publication of grouped operation affordances;
 - boolean or state-field indication in the operation representation;
 - documented operation contract when representation links are absent.
 

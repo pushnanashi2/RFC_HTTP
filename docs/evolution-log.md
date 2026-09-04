@@ -159,7 +159,7 @@ This log records why extraction and analysis logic changes over time.
 - root cause: The analysis joined concepts at repository/family scope instead of checking whether a cancel target maps to the same normalized operation resource as status/progress/result evidence.
 - change: Added route-level cancellation linkage metrics, operation-like target detection, and domain-transition-risk counts to candidate reports.
 - expected effect: Internet-Draft motivation uses a defensible operation-cancellation subset rather than raw `POST /.../{id}/cancel` shape counts.
-- actual effect: The refined 5,000-repository run now reports 407 strict cancellation families, 194 same-resource linked strict families, 215 operation-like-target strict families, and 302 strict families with at least one domain-transition-risk route.
+- actual effect: The refined 5,000-repository run now reports 407 strict cancellation families, 194 same-resource linked strict families, 222 operation-like-target strict families, and 297 strict families with at least one domain-transition-risk route.
 - regression added: Tests verify that same-repository async evidence does not link an unrelated business cancellation route.
 
 ## 2026-09-04 — Cancellation sampling protocol
@@ -201,3 +201,13 @@ This log records why extraction and analysis logic changes over time.
 - expected effect: Pattern-family precision and unique-family prevalence are measured with separate sheets and separate estimators.
 - actual effect: The documentation now treats the pattern-family sheet as a 517-membership frame, the family sheet as the 407-family frame, and the IPW collapse from the pattern sheet as exploratory only.
 - regression added: Tests verify the family sample contains unique `family_id` rows and strict-family estimator metadata.
+
+## 2026-09-04 — Route-record cancellation sampling
+
+- problem: Non-exclusive family-pattern strata cannot produce one population TP rate, and strict/non-strict scoring is orthogonal to operation-vs-domain semantics.
+- observed failure: The strict-linked set had 194 families and the excluded `delete-operation-resource` linked set had 185, but 97 families overlapped, so the naive 379-family upper bound double-counted.
+- root cause: Cancellation is a route-level semantic property, while previous validation sheets were optimized for family and pattern-denominator claims.
+- change: Added operation-resource linked intersection/union metrics, expanded operation-like LRO nouns, and added a `sample-cancellation-routes` command with exclusive route-record strata.
+- expected effect: Manual labels can produce a route-weighted operation-vs-domain TP estimate while family-level claims remain isolated in the strict-family sheet.
+- actual effect: The current route-record sheet contains 377 rows over a 1,658-record cancellation route frame, with `delete-operation-resource` sampled at 100 records and `post-subresource-cancel` split into 30 linked / 70 unlinked records.
+- regression added: Tests verify linked-set overlap metrics, route-record sample generation, and classification of non-CI/CD LRO nouns such as exports.

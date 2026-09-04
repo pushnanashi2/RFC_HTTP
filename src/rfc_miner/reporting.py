@@ -232,6 +232,7 @@ def append_operation_linkage(
 ) -> None:
     strict = linkage.get("strict") or {}
     all_metrics = linkage.get("all") or {}
+    operation_resource = linkage.get("operationResourceLinked") or {}
     async_metrics = (clusters.get("concepts") or {}).get("http-async-operation", {})
     async_families = int(async_metrics.get("independentFamilyCount") or 0)
     strict_families = int(strict.get("familyCount") or 0)
@@ -300,6 +301,56 @@ def append_operation_linkage(
         )
     )
     lines.append("")
+    if operation_resource:
+        strict_linked = int(operation_resource.get("strictLinkedFamilyCount") or 0)
+        delete_linked = int(operation_resource.get("deleteOperationLinkedFamilyCount") or 0)
+        overlap = int(operation_resource.get("strictAndDeleteOperationLinkedFamilyCount") or 0)
+        union = int(operation_resource.get("strictOrDeleteOperationLinkedFamilyCount") or 0)
+        lines.append("### Operation-Resource-Centered Envelope")
+        lines.append("")
+        lines.append(
+            "Strict explicit-cancel wording and operation-vs-domain semantics are orthogonal. "
+            "The denominator-safe structural claim is therefore an async-family envelope based "
+            "on same-resource operation linkage, not a single strict/non-strict percentage."
+        )
+        lines.append("")
+        lines.append("| Component | Families | Async denominator | Share | Role |")
+        lines.append("| --- | ---: | ---: | ---: | --- |")
+        lines.append(
+            "| Strict explicit-cancel routes with same-resource linkage | {families} | {denominator} | {share} | Conservative lower structural subset |".format(
+                families=strict_linked,
+                denominator=async_families,
+                share=percentage(strict_linked, async_families),
+            )
+        )
+        lines.append(
+            "| `delete-operation-resource` routes with same-resource linkage | {families} | {denominator} | {share} | Promotion-audit swing factor |".format(
+                families=delete_linked,
+                denominator=async_families,
+                share=percentage(delete_linked, async_families),
+            )
+        )
+        lines.append(
+            "| Overlap between the two linked sets | {families} | {denominator} | {share} | Prevents double counting |".format(
+                families=overlap,
+                denominator=async_families,
+                share=percentage(overlap, async_families),
+            )
+        )
+        lines.append(
+            "| Union of strict-linked and delete-linked sets | {families} | {denominator} | {share} | Pre-label upper structural envelope |".format(
+                families=union,
+                denominator=async_families,
+                share=percentage(union, async_families),
+            )
+        )
+        lines.append("")
+        lines.append(
+            "Manual labels still decide true operation-cancellation precision. The envelope "
+            "only states how many async families expose structurally linked cancellation-like "
+            "affordances before labeling."
+        )
+        lines.append("")
     lines.append("### Pattern Memberships")
     lines.append("")
     lines.append(
