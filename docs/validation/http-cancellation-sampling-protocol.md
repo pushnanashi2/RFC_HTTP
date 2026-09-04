@@ -21,6 +21,24 @@ Input:
 - family map: `/mnt/cash-data/rfc-http-miner/data-5000-refined/normalized/families.jsonl`
 - clusters: `/mnt/cash-data/rfc-http-miner/data-5000-refined/results/clusters.json`
 
+Generate the sheet:
+
+```bash
+rfc-miner sample-cancellation \
+  --data-dir /mnt/cash-data/rfc-http-miner/data-5000-refined \
+  --profile full
+```
+
+Default output:
+
+- `/mnt/cash-data/rfc-http-miner/data-5000-refined/results/validation/http-cancellation-sample.csv`
+- `/mnt/cash-data/rfc-http-miner/data-5000-refined/results/validation/http-cancellation-sample.summary.json`
+
+Current generated snapshot:
+
+- `docs/validation/http-cancellation-sample-2026-09-04.csv`
+- `docs/validation/http-cancellation-sample-2026-09-04.summary.json`
+
 Sampling unit:
 
 - one deduplicated evidence record, grouped by `family_id`, `repository`,

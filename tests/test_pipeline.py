@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import csv
 import json
 import os
 import shutil
@@ -30,6 +31,7 @@ from rfc_miner.models import error_record
 from rfc_miner.normalization import normalize_evidence, normalize_path, normalize_record
 from rfc_miner.paths import data_paths
 from rfc_miner.reporting import write_report
+from rfc_miner.sampling import write_cancellation_sample
 from rfc_miner.scoring import score_opportunities
 from rfc_miner.standards import compare_standards
 from rfc_miner.streaming import collect_and_analyze_streaming
@@ -449,6 +451,87 @@ class PipelineTests(unittest.TestCase):
             self.assertEqual(linkage["routeLevelOperationLinkedFamilyCount"], 1)
             self.assertEqual(linkage["operationTargetFamilyCount"], 1)
             self.assertEqual(linkage["domainTransitionRiskFamilyCount"], 1)
+
+    def test_cancellation_sample_sheet_uses_linkage_buckets(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            paths = data_paths(temporary)
+            write_jsonl(
+                paths.repositories,
+                [
+                    {"repo_id": "example/ops", "repository_url": "https://github.com/example/ops"},
+                    {
+                        "repo_id": "example/domain",
+                        "repository_url": "https://github.com/example/domain",
+                    },
+                ],
+            )
+            write_jsonl(
+                paths.raw_evidence,
+                [
+                    {
+                        "repository": "example/ops",
+                        "commit": "abc123",
+                        "concept": "http-async-operation",
+                        "evidenceType": "route",
+                        "httpMethod": "GET",
+                        "path": "/jobs/{id}/status",
+                        "responseCodes": [200],
+                        "file": "openapi.yaml",
+                        "lineStart": 1,
+                        "lineEnd": 1,
+                        "confidence": 0.9,
+                        "extractedValue": {},
+                        "extractor": "openapi",
+                    },
+                    {
+                        "repository": "example/ops",
+                        "commit": "abc123",
+                        "concept": "http-cancellation",
+                        "evidenceType": "route",
+                        "httpMethod": "POST",
+                        "path": "/jobs/{id}/cancel",
+                        "responseCodes": [202],
+                        "file": "openapi.yaml",
+                        "lineStart": 2,
+                        "lineEnd": 2,
+                        "confidence": 0.96,
+                        "extractedValue": {},
+                        "extractor": "openapi",
+                    },
+                    {
+                        "repository": "example/domain",
+                        "commit": "def456",
+                        "concept": "http-cancellation",
+                        "evidenceType": "route",
+                        "httpMethod": "POST",
+                        "path": "/subscriptions/{id}/cancel",
+                        "responseCodes": [200],
+                        "file": "openapi.yaml",
+                        "lineStart": 2,
+                        "lineEnd": 2,
+                        "confidence": 0.78,
+                        "extractedValue": {},
+                        "extractor": "openapi",
+                    },
+                ],
+            )
+            normalize_evidence(paths=paths)
+            dedupe_repositories(paths=paths)
+
+            output, count = write_cancellation_sample(paths=paths, profile="minimum", seed=1)
+            with output.open("r", encoding="utf-8", newline="") as handle:
+                rows = list(csv.DictReader(handle))
+
+            self.assertEqual(count, 2)
+            self.assertEqual({row["primaryLabel"] for row in rows}, {""})
+            self.assertEqual(
+                {row["linkageBucket"] for row in rows},
+                {"same-resource-linked", "domain-transition-risk"},
+            )
+            domain_row = next(row for row in rows if row["repository"] == "example/domain")
+            self.assertEqual(domain_row["cancelTargetPath"], "/subscriptions/{var}")
+            self.assertEqual(domain_row["domainTransitionRisk"], "true")
+            self.assertTrue(output.with_suffix(".summary.json").exists())
 
     def test_collect_records_clone_errors_and_continues(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:

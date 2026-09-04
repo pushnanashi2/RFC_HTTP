@@ -80,6 +80,7 @@ rfc-miner cluster
 rfc-miner compare-standards
 rfc-miner score
 rfc-miner report
+rfc-miner sample-cancellation
 ```
 
 ## Discover a 5000 repository seed
@@ -122,6 +123,7 @@ seed is written.
 - `data/results/report.md` — human-readable stage report with raw and deduplicated evidence counts
 - `data/results/candidates/http-cancellation.md` — cancellation candidate report, including route-level operation linkage
 - `data/results/manual-review.md` — TP/FP/FN validation checklist
+- `data/results/validation/http-cancellation-sample.csv` — stratified cancellation labeling sheet
 
 ## Reading the scores
 
@@ -145,6 +147,14 @@ routes such as `POST /subscriptions/{id}/cancel` can match the same shape as
 operation cancellation. Use the route-level operation-linkage metrics and the
 sampling protocol before making Internet-Draft prevalence claims.
 
+Generate the cancellation sample sheet with:
+
+```bash
+rfc-miner sample-cancellation \
+  --data-dir /mnt/cash-data/rfc-http-miner/data-5000-refined \
+  --profile full
+```
+
 ## Design documents
 
 - `docs/research-design.md`
@@ -152,6 +162,7 @@ sampling protocol before making Internet-Draft prevalence claims.
 - `docs/evolution-log.md`
 - `docs/prior-art/http-cancellation.md`
 - `docs/validation/http-cancellation-sampling-protocol.md`
+- `docs/validation/http-cancellation-sample-2026-09-04.csv`
 - `docs/drafts/http-operation-cancellation-outline.md`
 - `docs/runs/2026-09-04-5000-final.md`
 - `docs/runs/2026-09-04-5000-analysis.md`

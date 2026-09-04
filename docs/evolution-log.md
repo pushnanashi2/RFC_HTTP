@@ -171,3 +171,13 @@ This log records why extraction and analysis logic changes over time.
 - expected effect: The next validation pass can produce publishable TP-rate estimates without letting business cancellation or one large catalog dominate the sample.
 - actual effect: Internet-Draft drafting remains gated on manual operation-cancellation vs domain-state-transition sampling; `delete-operation-resource` is now described as definition-independent only for same-resource linkage, not for operation-like-target or zero-risk counts.
 - regression added: Generated candidate reports now include denominator-safe route-level linkage ratios, a risk-queue row, and non-exclusive pattern membership warnings.
+
+## 2026-09-04 — Cancellation validation sample generation
+
+- problem: The sampling protocol was documented but not executable, so the next validation step still depended on ad hoc spreadsheet construction.
+- observed failure: A reviewer could not reproduce the exact pattern mix, linkage buckets, repository caps, or blank label columns from the protocol alone.
+- root cause: Route-level linkage existed only as aggregate report data and was not reusable as per-record sampling metadata.
+- change: Added a deterministic `sample-cancellation` command that emits a CSV label sheet and summary JSON from normalized evidence and family data.
+- expected effect: Reviewers can label the same sample sheet and compute TP rates without redoing corpus extraction.
+- actual effect: The 5,000-repository run produced a 260-record unlabeled sample with all protocol strata filled: 80 `post-subresource-cancel`, 50 `post-action-cancel`, 30 `delete-action-cancel`, 27 `put-action-cancel`, 18 `get-cancel-link`, 5 `patch-state-cancelled`, and 50 `delete-operation-resource`.
+- regression added: Tests verify sample-sheet generation preserves same-resource-linked and domain-transition-risk buckets with blank labels.

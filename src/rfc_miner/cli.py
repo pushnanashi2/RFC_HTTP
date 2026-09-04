@@ -12,6 +12,7 @@ from .github_discovery import discover_github_repositories
 from .normalization import normalize_evidence
 from .paths import data_paths
 from .reporting import write_report
+from .sampling import write_cancellation_sample
 from .scoring import score_opportunities
 from .standards import compare_standards
 from .streaming import collect_and_analyze_streaming
@@ -68,6 +69,15 @@ def build_parser() -> argparse.ArgumentParser:
 
     report = subcommands.add_parser("report", help="write Markdown report")
     add_common(report)
+
+    cancellation_sample = subcommands.add_parser(
+        "sample-cancellation",
+        help="write a stratified HTTP cancellation validation sample sheet",
+    )
+    add_common(cancellation_sample)
+    cancellation_sample.add_argument("--output")
+    cancellation_sample.add_argument("--profile", choices=["full", "minimum"], default="full")
+    cancellation_sample.add_argument("--seed", type=int, default=20260904)
 
     run = subcommands.add_parser("run", help="run the full pipeline")
     add_common(run)
@@ -167,6 +177,16 @@ def main(argv: list[str] | None = None) -> int:
     if args.command == "report":
         write_report(paths=paths)
         print(f"report: {paths.report}")
+        return 0
+
+    if args.command == "sample-cancellation":
+        output, count = write_cancellation_sample(
+            paths=paths,
+            output_path=args.output,
+            profile=args.profile,
+            seed=args.seed,
+        )
+        print(f"cancellation sample: {output}; records: {count}")
         return 0
 
     if args.command == "run":

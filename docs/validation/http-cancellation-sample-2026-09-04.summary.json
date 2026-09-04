@@ -1,0 +1,18 @@
+{
+  "byLinkageBucket": {
+    "domain-transition-risk": 90,
+    "operation-like-target": 59,
+    "other": 11,
+    "same-resource-linked": 100
+  },
+  "byPattern": {
+    "delete-action-cancel": 30,
+    "delete-operation-resource": 50,
+    "get-cancel-link": 18,
+    "patch-state-cancelled": 5,
+    "post-action-cancel": 50,
+    "post-subresource-cancel": 80,
+    "put-action-cancel": 27
+  },
+  "sampleCount": 260
+}

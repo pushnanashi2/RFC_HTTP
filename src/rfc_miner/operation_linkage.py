@@ -42,15 +42,10 @@ def cancellation_linkage_metrics(
             continue
 
         pattern = str(record.get("pattern") or "unknown")
-        target_path = cancellation_target_path(str(record.get("normalizedPath") or record.get("path") or ""))
-        route_linked = target_path in async_paths_by_repo.get(repo_id, set())
-        operation_target = route_linked or has_async_noun(target_path)
-        domain_transition_risk = pattern in STRICT_CANCELLATION_PATTERNS and not operation_target
-        linkage = {
-            "routeLevelOperationLinked": route_linked,
-            "operationTarget": operation_target,
-            "domainTransitionRisk": domain_transition_risk,
-        }
+        linkage = cancellation_record_linkage(
+            record=record,
+            async_paths_by_repo=async_paths_by_repo,
+        )
 
         add_record(totals, repo_id, family_id, linkage)
         add_record(pattern_totals[pattern], repo_id, family_id, linkage)
@@ -65,6 +60,45 @@ def cancellation_linkage_metrics(
             for pattern, metrics in sorted(pattern_totals.items())
         },
     }
+
+
+def cancellation_record_linkage(
+    *,
+    record: dict[str, Any],
+    async_paths_by_repo: dict[str, set[str]],
+) -> dict[str, Any]:
+    repo_id = str(record.get("repository") or "")
+    pattern = str(record.get("pattern") or "unknown")
+    target_path = cancellation_target_path(str(record.get("normalizedPath") or record.get("path") or ""))
+    route_linked = target_path in async_paths_by_repo.get(repo_id, set())
+    operation_target = route_linked or has_async_noun(target_path)
+    domain_transition_risk = pattern in STRICT_CANCELLATION_PATTERNS and not operation_target
+    return {
+        "cancelTargetPath": target_path,
+        "routeLevelOperationLinked": route_linked,
+        "operationTarget": operation_target,
+        "domainTransitionRisk": domain_transition_risk,
+        "linkageBucket": linkage_bucket(
+            route_linked=route_linked,
+            operation_target=operation_target,
+            domain_transition_risk=domain_transition_risk,
+        ),
+    }
+
+
+def linkage_bucket(
+    *,
+    route_linked: bool,
+    operation_target: bool,
+    domain_transition_risk: bool,
+) -> str:
+    if route_linked:
+        return "same-resource-linked"
+    if operation_target:
+        return "operation-like-target"
+    if domain_transition_risk:
+        return "domain-transition-risk"
+    return "other"
 
 
 def async_operation_paths_by_repo(
