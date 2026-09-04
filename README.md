@@ -128,3 +128,4 @@ seed is written.
 - `docs/architecture.md`
 - `docs/evolution-log.md`
 - `docs/runs/2026-09-04-5000-final.md`
+- `docs/runs/2026-09-04-5000-analysis.md`
