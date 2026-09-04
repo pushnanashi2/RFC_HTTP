@@ -359,6 +359,95 @@ class PipelineTests(unittest.TestCase):
             self.assertEqual(openapi_record["duplicateEvidenceCount"], 2)
             self.assertEqual(source_record["pattern"], "post-202-accepted")
 
+    def test_cancellation_linkage_requires_same_operation_resource(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            paths = data_paths(temporary)
+            write_jsonl(
+                paths.repositories,
+                [
+                    {"repo_id": "example/ops", "repository_url": "https://github.com/example/ops"},
+                    {
+                        "repo_id": "example/domain",
+                        "repository_url": "https://github.com/example/domain",
+                    },
+                ],
+            )
+            write_jsonl(
+                paths.raw_evidence,
+                [
+                    {
+                        "repository": "example/ops",
+                        "commit": "abc123",
+                        "concept": "http-async-operation",
+                        "evidenceType": "route",
+                        "httpMethod": "GET",
+                        "path": "/jobs/{id}/status",
+                        "responseCodes": [200],
+                        "file": "openapi.yaml",
+                        "lineStart": 1,
+                        "lineEnd": 1,
+                        "confidence": 0.9,
+                        "extractedValue": {},
+                        "extractor": "openapi",
+                    },
+                    {
+                        "repository": "example/ops",
+                        "commit": "abc123",
+                        "concept": "http-cancellation",
+                        "evidenceType": "route",
+                        "httpMethod": "POST",
+                        "path": "/jobs/{id}/cancel",
+                        "responseCodes": [202],
+                        "file": "openapi.yaml",
+                        "lineStart": 2,
+                        "lineEnd": 2,
+                        "confidence": 0.96,
+                        "extractedValue": {},
+                        "extractor": "openapi",
+                    },
+                    {
+                        "repository": "example/domain",
+                        "commit": "def456",
+                        "concept": "http-async-operation",
+                        "evidenceType": "route",
+                        "httpMethod": "GET",
+                        "path": "/jobs/{id}/status",
+                        "responseCodes": [200],
+                        "file": "openapi.yaml",
+                        "lineStart": 1,
+                        "lineEnd": 1,
+                        "confidence": 0.9,
+                        "extractedValue": {},
+                        "extractor": "openapi",
+                    },
+                    {
+                        "repository": "example/domain",
+                        "commit": "def456",
+                        "concept": "http-cancellation",
+                        "evidenceType": "route",
+                        "httpMethod": "POST",
+                        "path": "/subscriptions/{id}/cancel",
+                        "responseCodes": [200],
+                        "file": "openapi.yaml",
+                        "lineStart": 2,
+                        "lineEnd": 2,
+                        "confidence": 0.78,
+                        "extractedValue": {},
+                        "extractor": "openapi",
+                    },
+                ],
+            )
+
+            normalize_evidence(paths=paths)
+            dedupe_repositories(paths=paths)
+            clusters = cluster_patterns(paths=paths)
+            linkage = clusters["concepts"]["http-cancellation"]["operationLinkage"]["strict"]
+
+            self.assertEqual(linkage["familyCount"], 2)
+            self.assertEqual(linkage["routeLevelOperationLinkedFamilyCount"], 1)
+            self.assertEqual(linkage["operationTargetFamilyCount"], 1)
+            self.assertEqual(linkage["domainTransitionRiskFamilyCount"], 1)
+
     def test_collect_records_clone_errors_and_continues(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             paths = data_paths(Path(temporary) / "data")

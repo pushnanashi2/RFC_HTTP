@@ -170,6 +170,8 @@ def candidate_detail(
     for pattern in score.get("strictPatterns") or []:
         lines.append(f"- `{pattern}`")
     lines.append("")
+    if concept == "http-cancellation" and metrics.get("operationLinkage"):
+        append_operation_linkage(lines, metrics["operationLinkage"])
     lines.append("## Observed Practice")
     lines.append("")
     for pattern, pattern_metrics in sorted((metrics.get("patterns") or {}).items()):
@@ -216,3 +218,43 @@ def candidate_detail(
     lines.append("- Define only reusable HTTP interaction semantics observed across independent implementations.")
     lines.append("- Avoid standardizing implementation bugs or framework-specific conventions.")
     return "\n".join(lines) + "\n"
+
+
+def append_operation_linkage(lines: list[str], linkage: dict[str, Any]) -> None:
+    strict = linkage.get("strict") or {}
+    all_metrics = linkage.get("all") or {}
+    lines.append("## Route-Level Operation Linkage")
+    lines.append("")
+    lines.append(
+        "This separates same-resource operation cancellation from domain state transitions "
+        "such as subscription, order, or booking cancellation."
+    )
+    lines.append("")
+    lines.append(f"- Strict cancellation families: {strict.get('familyCount', 0)}")
+    lines.append(
+        "- Strict families with same-resource async evidence: "
+        f"{strict.get('routeLevelOperationLinkedFamilyCount', 0)}"
+    )
+    lines.append(
+        "- Strict families targeting operation-like nouns: "
+        f"{strict.get('operationTargetFamilyCount', 0)}"
+    )
+    lines.append(
+        "- Strict families at domain-transition risk: "
+        f"{strict.get('domainTransitionRiskFamilyCount', 0)}"
+    )
+    lines.append(f"- All cancellation families: {all_metrics.get('familyCount', 0)}")
+    lines.append("")
+    lines.append("| Pattern | Families | Same-resource linked | Operation target | Domain-transition risk |")
+    lines.append("| --- | ---: | ---: | ---: | ---: |")
+    for pattern, pattern_metrics in sorted((linkage.get("byPattern") or {}).items()):
+        lines.append(
+            "| `{pattern}` | {families} | {linked} | {target} | {risk} |".format(
+                pattern=pattern,
+                families=pattern_metrics.get("familyCount", 0),
+                linked=pattern_metrics.get("routeLevelOperationLinkedFamilyCount", 0),
+                target=pattern_metrics.get("operationTargetFamilyCount", 0),
+                risk=pattern_metrics.get("domainTransitionRiskFamilyCount", 0),
+            )
+        )
+    lines.append("")

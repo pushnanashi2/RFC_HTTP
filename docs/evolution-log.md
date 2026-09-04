@@ -151,3 +151,13 @@ This log records why extraction and analysis logic changes over time.
 - expected effect: The next draft pitch can argue for standardizing observed semantics without overstating prevalence or proposing a new route shape.
 - actual effect: The current recommendation is to validate TP/FP samples first, then pursue `http-cancellation` as either a standalone cancellation profile or a section in a broader operation-resource draft.
 - regression added: Documentation now links the refined 5,000-repository results to prior art and a concrete draft outline.
+
+## 2026-09-04 — Route-level cancellation precision correction
+
+- problem: Repository/family-level async overlap made business-domain cancellation look like long-running operation cancellation.
+- observed failure: A repository with `/jobs/{id}/status` and `/subscriptions/{id}/cancel` could count as async-overlapping cancellation even though the cancel route targets a different resource.
+- root cause: The analysis joined concepts at repository/family scope instead of checking whether a cancel target maps to the same normalized operation resource as status/progress/result evidence.
+- change: Added route-level cancellation linkage metrics, operation-like target detection, and domain-transition-risk counts to candidate reports.
+- expected effect: Internet-Draft motivation uses a defensible operation-cancellation subset rather than raw `POST /.../{id}/cancel` shape counts.
+- actual effect: The refined 5,000-repository run now reports 407 strict cancellation families, 194 same-resource linked strict families, 215 operation-like-target strict families, and 302 strict families with at least one domain-transition-risk route.
+- regression added: Tests verify that same-repository async evidence does not link an unrelated business cancellation route.

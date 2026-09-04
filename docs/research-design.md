@@ -65,6 +65,9 @@ the local checkout is the reproducibility anchor.
 
 Reports must therefore separate raw repository counts from independent
 implementation family counts and show language/framework/vendor stratification.
+For cancellation, reports must also separate repository/family overlap from
+route-level operation linkage so business-domain cancellation does not inflate
+long-running-operation cancellation evidence.
 
 ## 5. Concept Taxonomy
 
@@ -79,6 +82,7 @@ Initial concepts:
   - action subresource cancellation
   - deletion-as-cancellation
   - state transition cancellation
+  - route-level operation cancellation linkage
 
 Concept rules are explicit data/configuration plus deterministic extractors.
 LLM suggestions may propose new synonyms or classes, but they are not accepted
@@ -240,6 +244,24 @@ conservative evidence subset:
 
 The strict score is intended to answer “does the RFC candidate survive after
 removing broad heuristics?” rather than replace the base score.
+
+For `http-cancellation`, strict scoring is still not sufficient by itself.
+Routes such as `POST /subscriptions/{id}/cancel` and
+`POST /jobs/{id}/cancel` share the same shape but have different semantics.
+Cancellation reports therefore compute route-level operation linkage:
+
+- same-resource async evidence: the cancel target maps to the same normalized
+  operation resource as a status/progress/result/operation route in that
+  repository;
+- operation-like target: the cancel target contains an operation-like noun such
+  as job, task, operation, run, execution, workflow, build, deployment, or
+  pipeline;
+- domain-transition risk: a strict cancellation route that has neither of the
+  previous properties.
+
+Manual sampling must label cancellation evidence as `operation-cancellation`,
+`domain-state-transition`, or `ambiguous` before using corpus prevalence claims
+in an Internet-Draft.
 
 ## 14. Reproducibility Strategy
 

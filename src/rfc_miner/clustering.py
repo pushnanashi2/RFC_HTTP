@@ -6,6 +6,7 @@ from pathlib import Path
 from typing import Any
 
 from .io import read_jsonl, write_json
+from .operation_linkage import cancellation_linkage_metrics
 from .paths import DataPaths, ensure_data_dirs
 
 
@@ -77,7 +78,7 @@ def cluster_patterns(
         )
 
         concept_repos = [repo_by_id[repo_id] for repo_id in repo_ids if repo_id in repo_by_id]
-        clusters["concepts"][concept] = {
+        concept_metrics = {
             "repositoryCount": len(repo_ids),
             "independentFamilyCount": len(family_ids),
             "evidenceCount": len(records),
@@ -113,6 +114,12 @@ def cluster_patterns(
                 for pattern in sorted(pattern_counts)
             },
         }
+        if concept == "http-cancellation":
+            concept_metrics["operationLinkage"] = cancellation_linkage_metrics(
+                evidence=evidence,
+                family_by_repo=family_by_repo,
+            )
+        clusters["concepts"][concept] = concept_metrics
 
     write_json(paths.clusters, clusters)
     return clusters

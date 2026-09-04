@@ -20,6 +20,9 @@ operation resource, status monitor, or equivalent observable operation handle.
 - The mined corpus shows strong shape convergence around
   `POST /.../{operation-id}/cancel`, with adjacent `PUT`, `PATCH`, `GET`, and
   `DELETE` variants.
+- Transport-level cancellation mechanisms such as HTTP/2 `RST_STREAM`,
+  HTTP/3 stream aborts, and client disconnects are not sufficient for this
+  problem: the server-side operation can outlive the request stream.
 - The gap is not endpoint naming. The gap is shared semantics:
   cancelability advertisement, accepted-but-not-complete responses,
   too-late-to-cancel responses, final-state observation, and retry behavior.
@@ -39,8 +42,8 @@ Out of scope:
 
 - defining a complete generic operation-resource model;
 - requiring a single URI shape for all APIs;
-- transport mechanisms other than HTTP;
-- domain-specific rollback or compensation guarantees.
+- defining transport stream cancellation semantics;
+- guaranteeing rollback, undo, or domain-specific compensation.
 
 ## 4. Relationship to Operation Resources
 
@@ -81,15 +84,29 @@ Candidate normative model:
 
 - a cancellation request asks the server to stop or prevent further processing
   of an identified operation;
-- cancellation is generally best-effort unless the API contract makes stronger
-  guarantees;
+- cancellation is best-effort unless the API contract makes stronger guarantees;
+- accepting a cancellation request does not imply rollback, undo, or
+  compensation for effects already applied;
 - the server MUST NOT report successful cancellation before the operation has
   reached a terminal canceled state, unless it clearly distinguishes request
   acceptance from completion;
 - duplicate cancellation requests SHOULD be safe and produce the same observable
   operation state.
 
-## 7. Response Semantics
+## 7. Effects and Partial Application
+
+The draft should explicitly separate cancellation from rollback.
+
+Candidate normative model:
+
+- an operation can have partially applied effects when cancellation is accepted;
+- the operation representation SHOULD expose whether effects were applied,
+  rolled back, compensated, or left application-defined when that distinction is
+  relevant to clients;
+- a successful cancellation terminal state means the operation stopped according
+  to the server contract, not that all prior side effects vanished.
+
+## 8. Response Semantics
 
 Candidate status-code mapping:
 
@@ -106,7 +123,7 @@ The draft should be careful not to overload `204 No Content`: it can mean “the
 request completed”, but not necessarily “the original operation is now canceled”
 unless the API contract says so.
 
-## 8. Observing Terminal State
+## 9. Observing Terminal State
 
 Clients need a stable way to learn whether the original operation:
 
@@ -119,7 +136,12 @@ Clients need a stable way to learn whether the original operation:
 The draft should define recommended terminal state names or a small vocabulary,
 while allowing application-specific representation fields.
 
-## 9. Retry and Idempotency
+Open issue for the draft: choose or profile terminal state naming. Google-style
+operation APIs represent successful cancellation as a terminal error state such
+as `CANCELLED`; Azure/OData-style APIs often expose an independent canceled
+status. This is one of the main interoperability gaps.
+
+## 10. Retry and Idempotency
 
 Cancellation requests are frequently retried after network loss. The draft
 should specify:
@@ -130,7 +152,50 @@ should specify:
   cancellation request;
 - whether a later retry can change the terminal result.
 
-## 10. Error Representation
+## 11. Completion and Cancellation Races
+
+The draft should define race behavior when completion and cancellation happen
+concurrently:
+
+- if the operation completed before cancellation was accepted, the server should
+  report a completed terminal state and a cancellation-too-late response;
+- if cancellation was accepted first but completion wins internally, the final
+  operation state must make that outcome observable;
+- clients must be told whether `202 Accepted` means the cancellation request was
+  accepted or the original operation is already terminal.
+
+## 12. Authorization
+
+Cancellation is state-changing authority. The draft should specify:
+
+- a client authorized to observe an operation is not automatically authorized to
+  cancel it;
+- cancellation of another principal's operation requires explicit authority;
+- signed cancel links need audience, expiry, replay, and scope constraints;
+- error responses should avoid leaking operation existence across principals.
+
+## 13. Propagation to Child Operations
+
+Operation graphs need explicit propagation behavior:
+
+- cancellation of a parent operation does not automatically imply cancellation
+  of child operations unless the API contract says so;
+- when propagation is supported, the operation representation should make child
+  cancellation progress and partial failures observable;
+- clients should not infer cascading rollback from cancellation acceptance.
+
+## 14. Retention and Expiry
+
+The draft should define how long canceled operation state remains observable:
+
+- operation/status resources should remain available long enough for clients to
+  observe the terminal state after a cancellation request;
+- `404 Not Found` and `410 Gone` should be distinguished when the server can
+  tell “never existed” from “existed but expired”;
+- cancel affordances should disappear or become non-operative after terminal
+  state or expiry.
+
+## 15. Error Representation
 
 Use Problem Details for structured cancellation errors where the response is not
 an operation representation. Candidate problem types:
@@ -140,7 +205,7 @@ an operation representation. Candidate problem types:
 - cancellation-conflict;
 - operation-expired.
 
-## 11. Security and Privacy Considerations
+## 16. Security and Privacy Considerations
 
 - Cancellation is a state-changing authority and requires authorization.
 - Guessable operation IDs can become denial-of-service handles.
@@ -148,7 +213,7 @@ an operation representation. Candidate problem types:
 - Status resources can leak existence, progress, ownership, and failure details.
 - Replay protection may be needed for signed cancel URLs.
 
-## 12. IANA Considerations
+## 17. IANA Considerations
 
 Possible registries or registrations:
 
@@ -156,11 +221,14 @@ Possible registries or registrations:
 - optional Problem Details types for common cancellation failures;
 - no new method registration.
 
-## 13. Evidence Appendix
+## 18. Evidence Appendix
 
 The appendix should cite:
 
 - the 5,000-repository refined corpus;
-- strict cancellation family count;
-- shape-convergence table with pattern-family memberships clearly labeled;
+- strict cancellation family count after route-level operation-linkage
+  correction;
+- operation-cancellation vs domain-state-transition sampling results;
+- shape-convergence table with pattern-family memberships clearly labeled as
+  non-exclusive;
 - TP/FP sample results before any WG adoption request.
