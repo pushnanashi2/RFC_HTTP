@@ -169,5 +169,5 @@ This log records why extraction and analysis logic changes over time.
 - root cause: The report exposed corrected metrics without a denominator-safe presentation or a pattern/repository-stratified validation protocol.
 - change: Rewrote the analysis ratios as denominator-explicit tables, repeated the non-exclusive membership warning in pattern tables, documented the `delete-operation-resource` tradeoff, and added a sampling protocol with pattern sample sizes, repository caps, labels, adjudication, and Wilson confidence intervals.
 - expected effect: The next validation pass can produce publishable TP-rate estimates without letting business cancellation or one large catalog dominate the sample.
-- actual effect: Internet-Draft drafting remains gated on manual operation-cancellation vs domain-state-transition sampling.
-- regression added: Generated candidate reports now include denominator-safe route-level linkage ratios.
+- actual effect: Internet-Draft drafting remains gated on manual operation-cancellation vs domain-state-transition sampling; `delete-operation-resource` is now described as definition-independent only for same-resource linkage, not for operation-like-target or zero-risk counts.
+- regression added: Generated candidate reports now include denominator-safe route-level linkage ratios, a risk-queue row, and non-exclusive pattern membership warnings.

@@ -40,6 +40,9 @@ Secondary audit population:
 
 - `delete-operation-resource`, because it has the strongest route-level linkage
   signal but is semantically ambiguous without explicit cancel wording.
+  Its operation-like-target and domain-transition-risk counts are mostly
+  definition-derived, so the informative pre-sampling signal is same-resource
+  async linkage.
 
 ## Current Strata
 
@@ -56,6 +59,10 @@ Rows are non-exclusive pattern-family memberships and must not be summed.
 | `delete-operation-resource` | 209 | 185 | 202 | 0 | 50 |
 
 Total proposed sample size: 260 records.
+
+For `delete-operation-resource`, use the 185/209 same-resource linkage as the
+reason to sample the bucket. Do not treat 202/209 operation-like target or zero
+domain-transition risk as independent evidence of precision.
 
 If reviewer time is constrained, use a 140-record minimum sample:
 

@@ -174,6 +174,11 @@ def candidate_detail(
         append_operation_linkage(lines, metrics["operationLinkage"], clusters)
     lines.append("## Observed Practice")
     lines.append("")
+    lines.append(
+        "Pattern family counts are non-exclusive memberships; a family can contribute "
+        "to multiple rows."
+    )
+    lines.append("")
     for pattern, pattern_metrics in sorted((metrics.get("patterns") or {}).items()):
         lines.append(
             f"- `{pattern}`: {pattern_metrics.get('familyCount', 0)} families, "
@@ -287,6 +292,13 @@ def append_operation_linkage(
             share=percentage(operation_target_families, async_families),
         )
     )
+    lines.append(
+        "| Domain-transition-risk review queue | {numerator} | strict cancellation families | {denominator} | {share} | Precision risk requiring manual labels |".format(
+            numerator=risk_families,
+            denominator=strict_families,
+            share=percentage(risk_families, strict_families),
+        )
+    )
     lines.append("")
     lines.append("### Pattern Memberships")
     lines.append("")
@@ -320,8 +332,10 @@ def append_operation_linkage(
             "can mean deletion, archival, or cancellation depending on the API contract. "
             "However, it is a high-signal review stratum: "
             f"{linked}/{families} families ({percentage(linked, families)}) have same-resource "
-            f"async linkage and {target}/{families} families ({percentage(target, families)}) "
-            "target operation-like nouns."
+            "async linkage. Its operation-like-target count "
+            f"({target}/{families}, {percentage(target, families)}) and zero domain-transition-risk "
+            "count are mostly consequences of how the pattern is defined, not independent "
+            "precision evidence."
         )
     lines.append("")
 

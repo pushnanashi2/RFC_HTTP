@@ -21,7 +21,7 @@ operation resource, status monitor, or equivalent observable operation handle.
   `POST /.../{operation-id}/cancel`, with adjacent `PUT`, `PATCH`, `GET`, and
   `DELETE` variants.
 - Transport-level cancellation mechanisms such as HTTP/2 `RST_STREAM`,
-  HTTP/3 stream aborts, and client disconnects are not sufficient for this
+  HTTP/3 request cancellation, and client disconnects are not sufficient for this
   problem: the server-side operation can outlive the request stream.
 - The gap is not endpoint naming. The gap is shared semantics:
   cancelability advertisement, accepted-but-not-complete responses,
