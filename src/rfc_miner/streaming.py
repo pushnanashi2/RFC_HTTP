@@ -43,6 +43,8 @@ def collect_and_analyze_streaming(
     repositories = read_jsonl(paths.repositories) if resume else []
     evidence = read_jsonl(paths.raw_evidence) if resume else []
     errors = read_jsonl(paths.errors) if resume else []
+    if resume:
+        repositories, evidence, errors = prune_retryable_records(repositories, evidence, errors)
     seed_order = {repo_id(item): index for index, item in enumerate(seed, start=1)}
     processed = {str(record.get("repo_id")) for record in repositories if record.get("repo_id")}
     pending = [(index, item) for index, item in enumerate(seed, start=1) if repo_id(item) not in processed]
@@ -222,6 +224,25 @@ def write_stream_outputs(
                 str(record.get("error") or ""),
             ),
         ),
+    )
+
+
+def prune_retryable_records(
+    repositories: list[dict[str, Any]],
+    evidence: list[dict[str, Any]],
+    errors: list[dict[str, Any]],
+) -> tuple[list[dict[str, Any]], list[dict[str, Any]], list[dict[str, Any]]]:
+    retryable_repo_ids = {
+        str(record.get("repo"))
+        for record in errors
+        if record.get("retryable") is True and record.get("repo")
+    }
+    if not retryable_repo_ids:
+        return repositories, evidence, errors
+    return (
+        [record for record in repositories if str(record.get("repo_id")) not in retryable_repo_ids],
+        [record for record in evidence if str(record.get("repository")) not in retryable_repo_ids],
+        [record for record in errors if str(record.get("repo")) not in retryable_repo_ids],
     )
 
 

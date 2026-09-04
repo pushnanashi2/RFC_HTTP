@@ -26,6 +26,7 @@ from rfc_miner.github_discovery import build_queries, seed_from_search_item, sho
 from rfc_miner.http_semantics import classify_route
 from rfc_miner.io import read_jsonl, write_jsonl
 from rfc_miner.io import write_json
+from rfc_miner.models import error_record
 from rfc_miner.normalization import normalize_evidence, normalize_path, normalize_record
 from rfc_miner.paths import data_paths
 from rfc_miner.reporting import write_report
@@ -271,6 +272,58 @@ class PipelineTests(unittest.TestCase):
             self.assertEqual(len(read_jsonl(paths.repositories)), 2)
             repo_ids = [record["repo_id"] for record in read_jsonl(paths.repositories)]
             self.assertEqual(sorted(repo_ids), sorted({repo["repo_id"] for repo in repositories}))
+
+    def test_streaming_resume_retries_retryable_repository_errors(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            paths = data_paths(Path(temporary) / "data")
+            seed_path = Path(temporary) / "seed.json"
+            seed = {
+                "repository_url": "https://github.com/example/service",
+                "owner": "example",
+                "name": "service",
+            }
+            write_json(seed_path, {"repositories": [seed]})
+            attempts = []
+
+            def fake_collect(item: dict[str, object], repo_root: Path, keep_repos: bool) -> tuple[dict[str, object], list[dict[str, object]], list[dict[str, object]]]:
+                attempts.append(item)
+                if len(attempts) == 1:
+                    return (
+                        {"repo_id": "example/service", "repository_url": seed["repository_url"]},
+                        [],
+                        [
+                            error_record(
+                                repo="example/service",
+                                stage="collect",
+                                error_type="git_clone_failed",
+                                error="temporary network failure",
+                                retryable=True,
+                            )
+                        ],
+                    )
+                return (
+                    {"repo_id": "example/service", "repository_url": seed["repository_url"]},
+                    [],
+                    [],
+                )
+
+            with patch("rfc_miner.streaming.collect_analyze_one", side_effect=fake_collect):
+                collect_and_analyze_streaming(
+                    seed_path=seed_path,
+                    paths=paths,
+                    repo_dir=Path(temporary) / "repos",
+                    progress=False,
+                )
+                collect_and_analyze_streaming(
+                    seed_path=seed_path,
+                    paths=paths,
+                    repo_dir=Path(temporary) / "repos",
+                    progress=False,
+                )
+
+            self.assertEqual(len(attempts), 2)
+            self.assertEqual(len(read_jsonl(paths.repositories)), 1)
+            self.assertEqual(read_jsonl(paths.errors), [])
 
     def test_cli_run_on_fixture_data(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
