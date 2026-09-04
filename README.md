@@ -114,13 +114,30 @@ seed is written.
 
 - `data/raw/repositories.jsonl` — collected repositories and pinned commits
 - `data/raw/evidence.jsonl` — extracted evidence with file, symbol, line, and extractor version
-- `data/normalized/evidence.jsonl` — normalized paths and interaction patterns
+- `data/normalized/evidence.jsonl` — normalized, repository-level deduplicated paths and interaction patterns
 - `data/normalized/families.jsonl` — raw repo to independent implementation family mapping
 - `data/results/clusters.json` — pattern counts, entropy, and family prevalence
 - `data/results/standards-comparison.json` — seeded standards coverage comparison
-- `data/results/opportunity-scores.json` — scored RFC candidates
-- `data/results/report.md` — human-readable stage report
+- `data/results/opportunity-scores.json` — scored RFC candidates, including strict-mode scores
+- `data/results/report.md` — human-readable stage report with raw and deduplicated evidence counts
 - `data/results/manual-review.md` — TP/FP/FN validation checklist
+
+## Reading the scores
+
+The base score is intentionally broad: it measures prevalence, independent
+families, implementation divergence, interoperability value, standards gap,
+standards correctness, and tractability.
+
+The strict score is a second, conservative lens. It only counts the strongest
+patterns for each concept:
+
+- `http-async-operation`: `post-202-accepted`, `mutation-202-accepted`, and
+  `get-status-resource`
+- `http-cancellation`: explicit cancellation verbs in the route path or
+  operation name, excluding the weak `delete-operation-resource` bucket
+
+Use raw evidence counts to understand extractor volume. Use deduplicated
+evidence, independent-family counts, and strict scores for RFC triage.
 
 ## Design documents
 

@@ -121,3 +121,23 @@ This log records why extraction and analysis logic changes over time.
 - expected effect: Large corpus runs complete with fewer false positives and expose generated-spec concentration rather than hiding it in raw evidence counts.
 - actual effect: The final run processed 5,000 repositories, found 4,994 independent implementation families, extracted 24,647 evidence records, recorded zero extraction errors, and produced two RFC candidates: `http-async-operation` and `http-cancellation`, both scoring 68.
 - regression added: Tests now cover unreadable repository entries, client-call/test-file skipping, decorator handler attribution, typed brace path normalization, discovery filtering, balanced discovery order, shallow clone flags, and streaming resume.
+
+## 2026-09-04 — Refined evidence aggregation and strict scoring
+
+- problem: Raw evidence counts were inflated by repeated generated OpenAPI catalogs, and broad async/cancellation heuristics made the RFC candidate ranking harder to trust.
+- observed failure: The 5,000-repository analysis showed that generated specs could dominate raw evidence volume and that `delete-operation-resource` was weaker than explicit cancellation actions.
+- root cause: Normalization preserved every matching file-level record even when the same repository repeated the same concept, method, normalized path, and source kind; scoring exposed only the broad score.
+- change: Normalized evidence is now deduplicated by repository, concept, method, normalized path, and source kind; score output now includes strict-mode counts and strict scores; Markdown reports label raw versus deduplicated evidence.
+- expected effect: RFC triage relies more on independent families and strong interaction patterns, while raw evidence remains available for extractor-volume diagnostics.
+- actual effect: The refined 5,000-repository run processed 5,000 repositories, found 4,993 independent families, extracted 24,914 raw evidence records, reduced them to 14,004 deduplicated evidence records, and recorded zero extraction errors. `http-cancellation` ranked first with score 69 and strict score 67; `http-async-operation` scored 68 with strict score 67.
+- regression added: Tests cover repository/source-kind deduplication, strict score fields, and report rendering of strict scores.
+
+## 2026-09-04 — Framework-specific route extraction expansion
+
+- problem: Deterministic source extraction missed common server routes in ASP.NET minimal APIs, Laravel route files, and Phoenix routers.
+- observed failure: Review identified missed relative Laravel paths, handler-name cancellation such as `MapPut("/tasks/{id}", CancelTask)`, and Phoenix scope prefixes.
+- root cause: Source-route patterns did not model these framework route declarations, and inline route actions were not used as operation names.
+- change: Added ASP.NET `MapGet/Post/Put/Patch/Delete`, ASP.NET `MapGroup` prefix recovery, Laravel `Route::` declarations with `Route::prefix`, Phoenix router routes with `scope`, and inline handler/action symbol extraction.
+- expected effect: Server-side route evidence increases for C#, PHP, and Elixir without admitting generic client calls.
+- actual effect: The refined 5,000-repository run found 216 Laravel route records across 20 repositories, 30 Phoenix route records across 3 repositories, and 18 ASP.NET minimal API records across 5 repositories.
+- regression added: Tests cover ASP.NET grouped routes, Laravel relative/prefixed routes, handler-name cancellation, Phoenix scope prefixes, and non-router Elixir client-call rejection.

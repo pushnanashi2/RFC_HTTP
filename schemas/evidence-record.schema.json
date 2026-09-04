@@ -37,6 +37,11 @@
     "normalizedPath": { "type": "string" },
     "pattern": { "type": "string" },
     "patternReason": { "type": "string" },
+    "sourceKind": { "type": "string" },
+    "duplicateEvidenceCount": {
+      "type": "integer",
+      "minimum": 2
+    },
     "normalizationRules": {
       "type": "array",
       "items": { "type": "string" }

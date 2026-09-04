@@ -13,6 +13,8 @@ from ..models import evidence_record
 SOURCE_SUFFIXES = {
     ".cjs",
     ".cs",
+    ".ex",
+    ".exs",
     ".go",
     ".java",
     ".js",
@@ -138,6 +140,36 @@ ROUTE_PATTERNS = [
         frozenset({".go"}),
     ),
     RoutePattern(
+        "aspnet-map-method",
+        re.compile(
+            r"\b(?P<receiver>app|group|routes|endpoints|api|[A-Za-z_][A-Za-z0-9_]*)\.Map(?P<method>Get|Post|Put|Patch|Delete)\s*\(\s*[`'\"](?P<path>/[^`'\"]+)[`'\"]",
+            re.IGNORECASE,
+        ),
+        lambda match: match.group("method"),
+        lambda match: match.group("path"),
+        frozenset({".cs"}),
+    ),
+    RoutePattern(
+        "laravel-route",
+        re.compile(
+            r"\bRoute::(?P<method>get|post|put|patch|delete)\s*\(\s*[`'\"](?P<path>/?[^`'\"]+)[`'\"]",
+            re.IGNORECASE,
+        ),
+        lambda match: match.group("method"),
+        lambda match: ensure_slash(match.group("path")),
+        frozenset({".php"}),
+    ),
+    RoutePattern(
+        "phoenix-route",
+        re.compile(
+            r"^\s*(?P<method>get|post|put|patch|delete)\s+[`'\"](?P<path>/[^`'\"]+)[`'\"]",
+            re.IGNORECASE | re.MULTILINE,
+        ),
+        lambda match: match.group("method"),
+        lambda match: match.group("path"),
+        frozenset({".ex", ".exs"}),
+    ),
+    RoutePattern(
         "rails-route",
         re.compile(
             r"\b(?P<method>get|post|put|patch|delete)\s+['\"](?P<path>/[^'\"]+)['\"]",
@@ -162,9 +194,11 @@ def extract_source_routes(repo: dict[str, Any], repo_root: str | Path) -> list[d
         for pattern in ROUTE_PATTERNS:
             if pattern.suffixes is not None and path.suffix.lower() not in pattern.suffixes:
                 continue
+            if pattern.name == "phoenix-route" and not is_phoenix_router_file(path):
+                continue
             for match in pattern.regex.finditer(text):
                 method = pattern.method(match).upper()
-                route_path = pattern.path(match)
+                route_path = qualify_route_path(pattern.name, pattern.path(match), text, match.start())
                 if not route_path.startswith("/"):
                     continue
                 line = line_for_index(text, match.start())
@@ -234,6 +268,11 @@ def is_test_file(path: Path) -> bool:
     )
 
 
+def is_phoenix_router_file(path: Path) -> bool:
+    name = path.name.lower()
+    return name in {"router.ex", "router.exs"} or name.endswith("_router.ex") or name.endswith("_router.exs")
+
+
 def response_codes_from_text(text: str) -> list[int]:
     codes: set[int] = set()
     if re.search(r"\b(?:HTTP_)?202(?:_ACCEPTED)?\b|Status202Accepted|StatusAccepted|http\.StatusAccepted", text):
@@ -279,7 +318,86 @@ def nearest_symbol(text: str, index: int) -> str | None:
 def route_symbol(pattern_name: str, text: str, start: int, end: int) -> str | None:
     if pattern_name in {"decorator-method", "flask-route-methods", "spring-short-mapping", "spring-request-mapping"}:
         return following_symbol(text, end) or nearest_symbol(text, start)
+    if pattern_name in {"aspnet-map-method", "laravel-route", "phoenix-route"}:
+        return inline_route_symbol(pattern_name, text, start, end) or nearest_symbol(text, start)
     return nearest_symbol(text, start)
+
+
+def inline_route_symbol(pattern_name: str, text: str, start: int, end: int) -> str | None:
+    line = current_line_slice(text, start, end)
+    if pattern_name == "aspnet-map-method":
+        for regex in (
+            re.compile(r",\s*(?:async\s*)?(?P<symbol>[A-Za-z_][A-Za-z0-9_\.]*)"),
+            re.compile(r"\.WithName\s*\(\s*[`'\"](?P<symbol>[^`'\"]+)[`'\"]"),
+        ):
+            match = regex.search(line)
+            if match:
+                return match.group("symbol").rsplit(".", 1)[-1]
+    if pattern_name == "laravel-route":
+        for regex in (
+            re.compile(r"['\"](?P<symbol>[A-Za-z_][A-Za-z0-9_]*)['\"]\s*\]"),
+            re.compile(r"@[A-Za-z_][A-Za-z0-9_]*['\"]?"),
+            re.compile(r"->name\s*\(\s*[`'\"](?P<symbol>[^`'\"]+)[`'\"]"),
+        ):
+            match = regex.search(line)
+            if match:
+                if "symbol" in match.groupdict():
+                    return match.group("symbol")
+                return match.group(0).strip("'\"").split("@")[-1]
+    if pattern_name == "phoenix-route":
+        match = re.search(r",\s*:(?P<symbol>[A-Za-z_][A-Za-z0-9_!?]*)\b", line)
+        if match:
+            return match.group("symbol")
+    return None
+
+
+def qualify_route_path(pattern_name: str, path: str, text: str, start: int) -> str:
+    route_path = ensure_slash(path)
+    prefix = route_prefix(pattern_name, text, start)
+    return join_paths(prefix, route_path) if prefix else route_path
+
+
+def route_prefix(pattern_name: str, text: str, start: int) -> str | None:
+    context = "\n".join(text[:start].splitlines()[-60:])
+    if pattern_name == "aspnet-map-method":
+        line = text[start : text.find("\n", start) if text.find("\n", start) != -1 else len(text)]
+        receiver_match = re.search(r"\b(?P<receiver>[A-Za-z_][A-Za-z0-9_]*)\.Map(?:Get|Post|Put|Patch|Delete)\b", line)
+        if not receiver_match:
+            return None
+        receiver = receiver_match.group("receiver")
+        if receiver in {"app", "routes", "endpoints"}:
+            return None
+        return last_prefix(
+            context,
+            rf"\b(?:var\s+)?{re.escape(receiver)}\s*=\s*[A-Za-z_][A-Za-z0-9_]*\.MapGroup\s*\(\s*[`'\"](?P<prefix>/[^`'\"]*)[`'\"]\s*\)",
+        )
+    if pattern_name == "phoenix-route":
+        return last_prefix(context, r"\bscope\s+[`'\"](?P<prefix>/[^`'\"]*)[`'\"]")
+    if pattern_name == "laravel-route":
+        return last_prefix(context, r"\bRoute::prefix\s*\(\s*[`'\"](?P<prefix>/?[^`'\"]+)[`'\"]\s*\)")
+    return None
+
+
+def last_prefix(text: str, regex: str) -> str | None:
+    matches = list(re.finditer(regex, text, re.IGNORECASE))
+    if not matches:
+        return None
+    prefix = matches[-1].group("prefix")
+    return ensure_slash(prefix)
+
+
+def join_paths(prefix: str, path: str) -> str:
+    if prefix == "/":
+        return path
+    return f"{prefix.rstrip('/')}/{path.lstrip('/')}"
+
+
+def current_line_slice(text: str, start: int, end: int) -> str:
+    line_start = text.rfind("\n", 0, start) + 1
+    line_end = text.find("\n", end)
+    if line_end == -1:
+        line_end = len(text)
+    return text[line_start:line_end]
 
 
 def following_symbol(text: str, index: int) -> str | None:

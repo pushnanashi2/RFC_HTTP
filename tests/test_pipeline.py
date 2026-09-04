@@ -71,9 +71,16 @@ class PipelineTests(unittest.TestCase):
             )
             scores = score_opportunities(paths=paths)
             self.assertGreaterEqual(len(scores["scores"]), 2)
+            for score in scores["scores"]:
+                self.assertIn("strictScore", score)
+                self.assertLessEqual(
+                    score["strictIndependentFamilyCount"],
+                    score["independentFamilyCount"],
+                )
 
             report = write_report(paths=paths)
             self.assertIn("Top Standardization Opportunities", report)
+            self.assertIn("Strict score", report)
             self.assertTrue((Path(temporary) / "results" / "candidates" / "http-cancellation.md").exists())
             self.assertTrue((Path(temporary) / "results" / "manual-review.md").exists())
 
@@ -118,6 +125,74 @@ class PipelineTests(unittest.TestCase):
             records = extract_source_routes({"repo_id": "example/service"}, root)
             self.assertEqual([record["path"] for record in records], ["/jobs/{job_id}/cancel"])
             self.assertEqual(records[0]["symbol"], "cancel_job")
+
+    def test_framework_specific_source_route_patterns(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            (root / "Program.cs").write_text(
+                "\n".join(
+                    [
+                        'app.MapPost("/jobs/{id}/cancel", () => Results.StatusCode(StatusCodes.Status202Accepted));',
+                        'var ops = app.MapGroup("/api");',
+                        'ops.MapPut("/tasks/{id}", CancelTask);',
+                    ]
+                ),
+                encoding="utf-8",
+            )
+            (root / "api.php").write_text(
+                "\n".join(
+                    [
+                        "Route::prefix('api')->group(function () {",
+                        "    Route::post('tasks/{id}/cancel', [TaskController::class, 'cancel']);",
+                        "    Route::delete('/tasks/{id}', [TaskController::class, 'cancel']);",
+                        "});",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+            (root / "router.ex").write_text(
+                'scope "/api", MyAppWeb do\n  post "/runs/:id/cancel", RunController, :cancel\nend\n',
+                encoding="utf-8",
+            )
+            records = extract_source_routes({"repo_id": "example/service"}, root)
+            extracted = {
+                (
+                    record["extractedValue"]["routePattern"],
+                    record["httpMethod"],
+                    record["path"],
+                    record["concept"],
+                )
+                for record in records
+            }
+            self.assertIn(
+                ("aspnet-map-method", "POST", "/jobs/{id}/cancel", "http-cancellation"),
+                extracted,
+            )
+            self.assertIn(
+                ("aspnet-map-method", "POST", "/jobs/{id}/cancel", "http-async-operation"),
+                extracted,
+            )
+            self.assertIn(
+                ("aspnet-map-method", "PUT", "/api/tasks/{id}", "http-cancellation"),
+                extracted,
+            )
+            self.assertIn(
+                ("laravel-route", "POST", "/api/tasks/{id}/cancel", "http-cancellation"),
+                extracted,
+            )
+            self.assertIn(
+                ("laravel-route", "DELETE", "/api/tasks/{id}", "http-cancellation"),
+                extracted,
+            )
+            self.assertIn(
+                ("phoenix-route", "POST", "/api/runs/:id/cancel", "http-cancellation"),
+                extracted,
+            )
+
+            with tempfile.TemporaryDirectory() as other_temporary:
+                other_root = Path(other_temporary)
+                (other_root / "client.ex").write_text('post "/runs/:id/cancel", body\n', encoding="utf-8")
+                self.assertEqual(extract_source_routes({"repo_id": "example/client"}, other_root), [])
 
     def test_extractors_skip_unreadable_directories(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
@@ -193,6 +268,96 @@ class PipelineTests(unittest.TestCase):
             }
         )
         self.assertEqual(cancel_plan["pattern"], "get-cancel-link")
+
+        put_name_based = normalize_record(
+            {
+                "concept": "http-cancellation",
+                "httpMethod": "PUT",
+                "path": "/tasks/{id}",
+                "responseCodes": [],
+                "symbol": "CancelTask",
+                "extractedValue": {},
+            }
+        )
+        self.assertEqual(put_name_based["pattern"], "put-action-cancel")
+
+        delete_name_based = normalize_record(
+            {
+                "concept": "http-cancellation",
+                "httpMethod": "DELETE",
+                "path": "/tasks/{id}",
+                "responseCodes": [],
+                "symbol": "cancel",
+                "extractedValue": {},
+            }
+        )
+        self.assertEqual(delete_name_based["pattern"], "delete-action-cancel")
+
+    def test_normalization_deduplicates_repository_source_kind(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            paths = data_paths(temporary)
+            write_jsonl(
+                paths.raw_evidence,
+                [
+                    {
+                        "repository": "example/service",
+                        "commit": "abc123",
+                        "concept": "http-async-operation",
+                        "evidenceType": "route",
+                        "httpMethod": "POST",
+                        "path": "/jobs",
+                        "responseCodes": [],
+                        "file": "openapi-v1.yaml",
+                        "symbol": "createJob",
+                        "lineStart": 1,
+                        "lineEnd": 1,
+                        "confidence": 0.6,
+                        "extractedValue": {},
+                        "extractor": "openapi",
+                    },
+                    {
+                        "repository": "example/service",
+                        "commit": "abc123",
+                        "concept": "http-async-operation",
+                        "evidenceType": "route",
+                        "httpMethod": "POST",
+                        "path": "/jobs",
+                        "responseCodes": [202],
+                        "file": "openapi-v2.yaml",
+                        "symbol": "createJob",
+                        "lineStart": 2,
+                        "lineEnd": 2,
+                        "confidence": 0.5,
+                        "extractedValue": {},
+                        "extractor": "openapi-yaml-lite",
+                    },
+                    {
+                        "repository": "example/service",
+                        "commit": "abc123",
+                        "concept": "http-async-operation",
+                        "evidenceType": "route",
+                        "httpMethod": "POST",
+                        "path": "/jobs",
+                        "responseCodes": [202],
+                        "file": "routes.py",
+                        "symbol": "create_job",
+                        "lineStart": 3,
+                        "lineEnd": 3,
+                        "confidence": 0.7,
+                        "extractedValue": {},
+                        "extractor": "source-routes",
+                    },
+                ],
+            )
+
+            normalized = normalize_evidence(paths=paths)
+            self.assertEqual(len(normalized), 2)
+            openapi_record = next(record for record in normalized if record["sourceKind"] == "openapi")
+            source_record = next(record for record in normalized if record["sourceKind"] == "source")
+            self.assertEqual(openapi_record["responseCodes"], [202])
+            self.assertEqual(openapi_record["pattern"], "post-202-accepted")
+            self.assertEqual(openapi_record["duplicateEvidenceCount"], 2)
+            self.assertEqual(source_record["pattern"], "post-202-accepted")
 
     def test_collect_records_clone_errors_and_continues(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:

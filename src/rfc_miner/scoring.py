@@ -3,10 +3,31 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
-from .io import read_json, write_json
+from .clustering import normalized_entropy
+from .io import read_json, read_jsonl, write_json
 from .paths import DataPaths, ensure_data_dirs
 from .standards import COVERAGE_ORDER
 
+
+STRICT_PATTERNS = {
+    "http-async-operation": frozenset(
+        {
+            "post-202-accepted",
+            "mutation-202-accepted",
+            "get-status-resource",
+        }
+    ),
+    "http-cancellation": frozenset(
+        {
+            "post-subresource-cancel",
+            "post-action-cancel",
+            "put-action-cancel",
+            "get-cancel-link",
+            "patch-state-cancelled",
+            "delete-action-cancel",
+        }
+    ),
+}
 
 INTEROPERABILITY_VALUE = {
     "http-async-operation": 13,
@@ -24,10 +45,17 @@ def score_opportunities(
     paths: DataPaths,
     clusters_path: str | Path | None = None,
     standards_path: str | Path | None = None,
+    normalized_evidence_path: str | Path | None = None,
+    families_path: str | Path | None = None,
 ) -> dict[str, Any]:
     ensure_data_dirs(paths)
     clusters = read_json(clusters_path or paths.clusters, default={"concepts": {}})
     standards = read_json(standards_path or paths.standards_comparison, default={"concepts": {}})
+    strict_by_concept = strict_metrics(
+        paths=paths,
+        normalized_evidence_path=normalized_evidence_path,
+        families_path=families_path,
+    )
     total_families = int(clusters.get("independentFamilyCount") or 0)
     scores: list[dict[str, Any]] = []
 
@@ -50,11 +78,28 @@ def score_opportunities(
             "specificationTractability": SPEC_TRACTABILITY.get(concept, 3),
         }
         total = int(sum(components.values()))
+        strict = strict_by_concept.get(concept, empty_strict_metrics())
+        strict_components = {
+            "prevalence": prevalence_score(strict["independentFamilyCount"], total_families),
+            "independentImplementations": independent_score(strict["independentFamilyCount"]),
+            "implementationDivergence": round(strict["entropy"] * 20),
+            "interoperabilityValue": INTEROPERABILITY_VALUE.get(concept, 10),
+            "standardsGap": standards_gap_score(best_coverage),
+            "standardsCorrectness": 2 if conflicts else 4,
+            "specificationTractability": SPEC_TRACTABILITY.get(concept, 3),
+        }
         scores.append(
             {
                 "concept": concept,
                 "score": total,
                 "components": components,
+                "strictScore": int(sum(strict_components.values())),
+                "strictComponents": strict_components,
+                "strictIndependentFamilyCount": strict["independentFamilyCount"],
+                "strictRepositoryCount": strict["repositoryCount"],
+                "strictEvidenceCount": strict["evidenceCount"],
+                "strictPatternCount": strict["patternCount"],
+                "strictPatterns": sorted(STRICT_PATTERNS.get(concept, ())),
                 "rawRepositoryCount": metrics.get("repositoryCount", 0),
                 "independentFamilyCount": family_count,
                 "patternCount": pattern_count,
@@ -73,6 +118,63 @@ def score_opportunities(
     }
     write_json(paths.opportunity_scores, result)
     return result
+
+
+def strict_metrics(
+    *,
+    paths: DataPaths,
+    normalized_evidence_path: str | Path | None = None,
+    families_path: str | Path | None = None,
+) -> dict[str, dict[str, Any]]:
+    evidence = read_jsonl(normalized_evidence_path or paths.normalized_evidence)
+    families = read_jsonl(families_path or paths.families)
+    family_by_repo = {str(record.get("repo_id") or ""): record for record in families}
+    concept_repos: dict[str, set[str]] = {}
+    concept_families: dict[str, set[str]] = {}
+    concept_patterns: dict[str, set[str]] = {}
+    pattern_families: dict[str, dict[str, set[str]]] = {}
+    evidence_counts: dict[str, int] = {}
+
+    for record in evidence:
+        concept = str(record.get("concept") or "")
+        pattern = str(record.get("pattern") or "")
+        if pattern not in STRICT_PATTERNS.get(concept, ()):
+            continue
+        repo_id = str(record.get("repository") or "")
+        family = family_by_repo.get(repo_id)
+        if family and family.get("excluded_from_independent_count"):
+            continue
+        family_id = str((family or {}).get("family_id") or repo_id)
+        concept_repos.setdefault(concept, set()).add(repo_id)
+        concept_families.setdefault(concept, set()).add(family_id)
+        concept_patterns.setdefault(concept, set()).add(pattern)
+        pattern_families.setdefault(concept, {}).setdefault(pattern, set()).add(family_id)
+        evidence_counts[concept] = evidence_counts.get(concept, 0) + 1
+
+    results: dict[str, dict[str, Any]] = {}
+    for concept in set(concept_families) | set(STRICT_PATTERNS):
+        pattern_counts = {
+            pattern: len(families_for_pattern)
+            for pattern, families_for_pattern in pattern_families.get(concept, {}).items()
+        }
+        results[concept] = {
+            "repositoryCount": len(concept_repos.get(concept, set())),
+            "independentFamilyCount": len(concept_families.get(concept, set())),
+            "evidenceCount": evidence_counts.get(concept, 0),
+            "patternCount": len(concept_patterns.get(concept, set())),
+            "entropy": normalized_entropy(pattern_counts),
+        }
+    return results
+
+
+def empty_strict_metrics() -> dict[str, Any]:
+    return {
+        "repositoryCount": 0,
+        "independentFamilyCount": 0,
+        "evidenceCount": 0,
+        "patternCount": 0,
+        "entropy": 0.0,
+    }
 
 
 def prevalence_score(family_count: int, total_families: int) -> int:

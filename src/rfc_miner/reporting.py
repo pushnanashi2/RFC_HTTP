@@ -13,6 +13,7 @@ def write_report(*, paths: DataPaths) -> str:
     scores = read_json(paths.opportunity_scores, default={"scores": []})
     standards = read_json(paths.standards_comparison, default={"concepts": {}})
     errors = read_jsonl(paths.errors)
+    raw_evidence = read_jsonl(paths.raw_evidence)
     evidence = read_jsonl(paths.normalized_evidence)
 
     lines: list[str] = []
@@ -22,19 +23,23 @@ def write_report(*, paths: DataPaths) -> str:
     lines.append("")
     lines.append(f"- Raw repositories: {clusters.get('rawRepositoryCount', 0)}")
     lines.append(f"- Independent implementation families: {clusters.get('independentFamilyCount', 0)}")
+    lines.append(f"- Raw evidence records: {len(raw_evidence)}")
+    lines.append(f"- Deduplicated evidence records: {len(evidence)}")
     lines.append(f"- Extraction errors: {len(errors)}")
     lines.append("")
     lines.append("## Top Standardization Opportunities")
     lines.append("")
-    lines.append("| Rank | Concept | Score | Families | Patterns | Standards coverage |")
-    lines.append("| ---: | --- | ---: | ---: | ---: | --- |")
+    lines.append("| Rank | Concept | Score | Strict score | Families | Strict families | Patterns | Standards coverage |")
+    lines.append("| ---: | --- | ---: | ---: | ---: | ---: | ---: | --- |")
     for index, score in enumerate(scores.get("scores") or [], start=1):
         lines.append(
-            "| {rank} | `{concept}` | {score} | {families} | {patterns} | {coverage} |".format(
+            "| {rank} | `{concept}` | {score} | {strict_score} | {families} | {strict_families} | {patterns} | {coverage} |".format(
                 rank=index,
                 concept=score["concept"],
                 score=score["score"],
+                strict_score=score.get("strictScore", 0),
                 families=score.get("independentFamilyCount", 0),
+                strict_families=score.get("strictIndependentFamilyCount", 0),
                 patterns=score.get("patternCount", 0),
                 coverage=score.get("bestStandardsCoverage", "unknown"),
             )
@@ -135,12 +140,17 @@ def candidate_detail(
     lines.append("## Summary")
     lines.append("")
     lines.append(f"- Score: {score.get('score', 0)}")
+    lines.append(f"- Strict score: {score.get('strictScore', 0)}")
     lines.append(f"- Independent families: {metrics.get('independentFamilyCount', 0)}")
+    lines.append(f"- Strict independent families: {score.get('strictIndependentFamilyCount', 0)}")
     lines.append(f"- Raw repositories: {metrics.get('repositoryCount', 0)}")
-    lines.append(f"- Evidence records: {metrics.get('evidenceCount', 0)}")
+    lines.append(f"- Strict repositories: {score.get('strictRepositoryCount', 0)}")
+    lines.append(f"- Deduplicated evidence records: {metrics.get('evidenceCount', 0)}")
+    lines.append(f"- Strict evidence records: {score.get('strictEvidenceCount', 0)}")
     lines.append(f"- Capped evidence records: {metrics.get('cappedEvidenceCount', 0)}")
     lines.append(f"- Dominant repository evidence share: {metrics.get('dominantRepositoryEvidenceRatio', 0)}")
     lines.append(f"- Observed patterns: {metrics.get('numberOfPatterns', 0)}")
+    lines.append(f"- Strict patterns: {score.get('strictPatternCount', 0)}")
     lines.append(f"- Best seeded standards coverage: {comparison.get('bestCoverage', 'unknown')}")
     lines.append("")
     lines.append("## Evidence Concentration")
@@ -153,6 +163,12 @@ def candidate_detail(
                 share=entry.get("share"),
             )
         )
+    lines.append("")
+    lines.append("## Strict Evidence")
+    lines.append("")
+    lines.append("Strict mode counts only the strongest interaction patterns for this concept:")
+    for pattern in score.get("strictPatterns") or []:
+        lines.append(f"- `{pattern}`")
     lines.append("")
     lines.append("## Observed Practice")
     lines.append("")

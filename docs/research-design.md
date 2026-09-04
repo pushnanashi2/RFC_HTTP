@@ -149,6 +149,11 @@ normalize to a shared path shape and then to an interaction pattern such as
 Normalization rules are explicit files under `config/normalization` and
 `config/patterns`.
 
+Normalized evidence is deduplicated at repository scope by concept, HTTP method,
+normalized path, and source kind. This keeps generated OpenAPI version catalogs
+from inflating evidence volume while still retaining separate implementation and
+specification sources when both are present.
+
 ## 10. Pattern Definition
 
 Patterns are interaction semantics, not just naming similarity.
@@ -223,6 +228,18 @@ Scores are 0-100 with visible components:
 
 The score ranks review priority. It does not automatically decide that an RFC
 should be written.
+
+Each concept also receives a strict score using the same component model over a
+conservative evidence subset:
+
+- `http-async-operation` strict evidence counts `202 Accepted` mutation
+  responses and explicit status resources.
+- `http-cancellation` strict evidence counts explicit cancellation verbs in the
+  route path or operation name, and excludes weak `DELETE` operation-resource
+  evidence without cancellation wording.
+
+The strict score is intended to answer “does the RFC candidate survive after
+removing broad heuristics?” rather than replace the base score.
 
 ## 14. Reproducibility Strategy
 
