@@ -120,6 +120,7 @@ seed is written.
 - `data/results/standards-comparison.json` — seeded standards coverage comparison
 - `data/results/opportunity-scores.json` — scored RFC candidates, including strict-mode scores
 - `data/results/report.md` — human-readable stage report with raw and deduplicated evidence counts
+- `data/results/candidates/http-cancellation.md` — cancellation candidate report, including route-level operation linkage
 - `data/results/manual-review.md` — TP/FP/FN validation checklist
 
 ## Reading the scores
@@ -139,12 +140,18 @@ patterns for each concept:
 Use raw evidence counts to understand extractor volume. Use deduplicated
 evidence, independent-family counts, and strict scores for RFC triage.
 
+For `http-cancellation`, strict score is not enough by itself because business
+routes such as `POST /subscriptions/{id}/cancel` can match the same shape as
+operation cancellation. Use the route-level operation-linkage metrics and the
+sampling protocol before making Internet-Draft prevalence claims.
+
 ## Design documents
 
 - `docs/research-design.md`
 - `docs/architecture.md`
 - `docs/evolution-log.md`
 - `docs/prior-art/http-cancellation.md`
+- `docs/validation/http-cancellation-sampling-protocol.md`
 - `docs/drafts/http-operation-cancellation-outline.md`
 - `docs/runs/2026-09-04-5000-final.md`
 - `docs/runs/2026-09-04-5000-analysis.md`

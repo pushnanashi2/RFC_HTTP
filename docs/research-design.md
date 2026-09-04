@@ -261,7 +261,8 @@ Cancellation reports therefore compute route-level operation linkage:
 
 Manual sampling must label cancellation evidence as `operation-cancellation`,
 `domain-state-transition`, or `ambiguous` before using corpus prevalence claims
-in an Internet-Draft.
+in an Internet-Draft. The current sampling protocol is
+`docs/validation/http-cancellation-sampling-protocol.md`.
 
 ## 14. Reproducibility Strategy
 

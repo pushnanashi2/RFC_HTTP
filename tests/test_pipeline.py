@@ -81,7 +81,9 @@ class PipelineTests(unittest.TestCase):
             report = write_report(paths=paths)
             self.assertIn("Top Standardization Opportunities", report)
             self.assertIn("Strict score", report)
-            self.assertTrue((Path(temporary) / "results" / "candidates" / "http-cancellation.md").exists())
+            cancellation_candidate = Path(temporary) / "results" / "candidates" / "http-cancellation.md"
+            self.assertTrue(cancellation_candidate.exists())
+            self.assertIn("Denominator-Safe Ratios", cancellation_candidate.read_text(encoding="utf-8"))
             self.assertTrue((Path(temporary) / "results" / "manual-review.md").exists())
 
     def test_path_normalization_unifies_common_route_syntaxes(self) -> None:

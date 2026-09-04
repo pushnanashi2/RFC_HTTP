@@ -171,7 +171,7 @@ def candidate_detail(
         lines.append(f"- `{pattern}`")
     lines.append("")
     if concept == "http-cancellation" and metrics.get("operationLinkage"):
-        append_operation_linkage(lines, metrics["operationLinkage"])
+        append_operation_linkage(lines, metrics["operationLinkage"], clusters)
     lines.append("## Observed Practice")
     lines.append("")
     for pattern, pattern_metrics in sorted((metrics.get("patterns") or {}).items()):
@@ -220,9 +220,19 @@ def candidate_detail(
     return "\n".join(lines) + "\n"
 
 
-def append_operation_linkage(lines: list[str], linkage: dict[str, Any]) -> None:
+def append_operation_linkage(
+    lines: list[str],
+    linkage: dict[str, Any],
+    clusters: dict[str, Any],
+) -> None:
     strict = linkage.get("strict") or {}
     all_metrics = linkage.get("all") or {}
+    async_metrics = (clusters.get("concepts") or {}).get("http-async-operation", {})
+    async_families = int(async_metrics.get("independentFamilyCount") or 0)
+    strict_families = int(strict.get("familyCount") or 0)
+    same_resource_families = int(strict.get("routeLevelOperationLinkedFamilyCount") or 0)
+    operation_target_families = int(strict.get("operationTargetFamilyCount") or 0)
+    risk_families = int(strict.get("domainTransitionRiskFamilyCount") or 0)
     lines.append("## Route-Level Operation Linkage")
     lines.append("")
     lines.append(
@@ -233,23 +243,63 @@ def append_operation_linkage(lines: list[str], linkage: dict[str, Any]) -> None:
     lines.append(f"- Strict cancellation families: {strict.get('familyCount', 0)}")
     lines.append(
         "- Strict families with same-resource async evidence: "
-        f"{strict.get('routeLevelOperationLinkedFamilyCount', 0)}"
+        f"{same_resource_families}"
     )
     lines.append(
         "- Strict families targeting operation-like nouns: "
-        f"{strict.get('operationTargetFamilyCount', 0)}"
+        f"{operation_target_families}"
     )
     lines.append(
         "- Strict families at domain-transition risk: "
-        f"{strict.get('domainTransitionRiskFamilyCount', 0)}"
+        f"{risk_families}"
     )
     lines.append(f"- All cancellation families: {all_metrics.get('familyCount', 0)}")
     lines.append("")
-    lines.append("| Pattern | Families | Same-resource linked | Operation target | Domain-transition risk |")
-    lines.append("| --- | ---: | ---: | ---: | ---: |")
+    lines.append("### Denominator-Safe Ratios")
+    lines.append("")
+    lines.append("| Claim | Numerator | Denominator population | Denominator | Share | Safe use |")
+    lines.append("| --- | ---: | --- | ---: | ---: | --- |")
+    lines.append(
+        "| Same-resource linkage within strict cancellation | {numerator} | strict cancellation families | {denominator} | {share} | Operation-cancellation precision check |".format(
+            numerator=same_resource_families,
+            denominator=strict_families,
+            share=percentage(same_resource_families, strict_families),
+        )
+    )
+    lines.append(
+        "| Operation-like target within strict cancellation | {numerator} | strict cancellation families | {denominator} | {share} | Broader operation-cancellation recall check |".format(
+            numerator=operation_target_families,
+            denominator=strict_families,
+            share=percentage(operation_target_families, strict_families),
+        )
+    )
+    lines.append(
+        "| Same-resource cancellation among async families | {numerator} | async-operation families | {denominator} | {share} | Conservative async-affordance claim |".format(
+            numerator=same_resource_families,
+            denominator=async_families,
+            share=percentage(same_resource_families, async_families),
+        )
+    )
+    lines.append(
+        "| Operation-like cancellation among async families | {numerator} | async-operation families | {denominator} | {share} | Broad async-affordance claim after review |".format(
+            numerator=operation_target_families,
+            denominator=async_families,
+            share=percentage(operation_target_families, async_families),
+        )
+    )
+    lines.append("")
+    lines.append("### Pattern Memberships")
+    lines.append("")
+    lines.append(
+        "Rows are non-exclusive memberships. Do not add row counts together or compare "
+        "their sum to the strict family total."
+    )
+    lines.append("")
+    lines.append("| Pattern | Families | Same-resource linked | Operation target | Domain-transition risk | Counting rule |")
+    lines.append("| --- | ---: | ---: | ---: | ---: | --- |")
     for pattern, pattern_metrics in sorted((linkage.get("byPattern") or {}).items()):
         lines.append(
-            "| `{pattern}` | {families} | {linked} | {target} | {risk} |".format(
+            "| `{pattern}` | {families} | {linked} | {target} | {risk} | non-exclusive membership |".format(
                 pattern=pattern,
                 families=pattern_metrics.get("familyCount", 0),
                 linked=pattern_metrics.get("routeLevelOperationLinkedFamilyCount", 0),
@@ -257,4 +307,26 @@ def append_operation_linkage(lines: list[str], linkage: dict[str, Any]) -> None:
                 risk=pattern_metrics.get("domainTransitionRiskFamilyCount", 0),
             )
         )
+    delete_metrics = (linkage.get("byPattern") or {}).get("delete-operation-resource")
+    if delete_metrics:
+        families = int(delete_metrics.get("familyCount") or 0)
+        linked = int(delete_metrics.get("routeLevelOperationLinkedFamilyCount") or 0)
+        target = int(delete_metrics.get("operationTargetFamilyCount") or 0)
+        lines.append("")
+        lines.append("### Deletion-as-Cancellation Review Note")
+        lines.append("")
+        lines.append(
+            "`delete-operation-resource` is outside strict scoring because `DELETE /jobs/{id}` "
+            "can mean deletion, archival, or cancellation depending on the API contract. "
+            "However, it is a high-signal review stratum: "
+            f"{linked}/{families} families ({percentage(linked, families)}) have same-resource "
+            f"async linkage and {target}/{families} families ({percentage(target, families)}) "
+            "target operation-like nouns."
+        )
     lines.append("")
+
+
+def percentage(numerator: int, denominator: int) -> str:
+    if denominator <= 0:
+        return "n/a"
+    return f"{(numerator / denominator) * 100:.1f}%"

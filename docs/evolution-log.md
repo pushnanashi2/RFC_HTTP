@@ -161,3 +161,13 @@ This log records why extraction and analysis logic changes over time.
 - expected effect: Internet-Draft motivation uses a defensible operation-cancellation subset rather than raw `POST /.../{id}/cancel` shape counts.
 - actual effect: The refined 5,000-repository run now reports 407 strict cancellation families, 194 same-resource linked strict families, 215 operation-like-target strict families, and 302 strict families with at least one domain-transition-risk route.
 - regression added: Tests verify that same-repository async evidence does not link an unrelated business cancellation route.
+
+## 2026-09-04 — Cancellation sampling protocol
+
+- problem: The analysis still mixed denominators in prose and did not define a repeatable manual labeling plan.
+- observed failure: Readers could confuse `/407` strict-cancellation ratios with `/631` async-family ratios, add non-exclusive pattern rows, or miss why the highly linked `delete-operation-resource` bucket stayed outside strict scoring.
+- root cause: The report exposed corrected metrics without a denominator-safe presentation or a pattern/repository-stratified validation protocol.
+- change: Rewrote the analysis ratios as denominator-explicit tables, repeated the non-exclusive membership warning in pattern tables, documented the `delete-operation-resource` tradeoff, and added a sampling protocol with pattern sample sizes, repository caps, labels, adjudication, and Wilson confidence intervals.
+- expected effect: The next validation pass can produce publishable TP-rate estimates without letting business cancellation or one large catalog dominate the sample.
+- actual effect: Internet-Draft drafting remains gated on manual operation-cancellation vs domain-state-transition sampling.
+- regression added: Generated candidate reports now include denominator-safe route-level linkage ratios.
