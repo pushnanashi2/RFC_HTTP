@@ -175,7 +175,7 @@ def clone_or_update(repository_url: str, destination: Path) -> None:
     if destination.exists():
         shutil.rmtree(destination)
     subprocess.run(
-        ["git", "clone", "--depth", "1", repository_url, str(destination)],
+        ["git", "clone", "--depth", "1", "--single-branch", "--no-tags", repository_url, str(destination)],
         check=True,
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,

@@ -9,6 +9,9 @@ from .io import read_jsonl, write_json
 from .paths import DataPaths, ensure_data_dirs
 
 
+MAX_EVIDENCE_PER_REPOSITORY_CONCEPT = 50
+
+
 def cluster_patterns(
     *,
     paths: DataPaths,
@@ -52,6 +55,7 @@ def cluster_patterns(
         pattern_families: dict[str, set[str]] = defaultdict(set)
         pattern_repos: dict[str, set[str]] = defaultdict(set)
         pattern_examples: dict[str, list[dict[str, Any]]] = defaultdict(list)
+        repository_evidence_counts = Counter(str(record.get("repository") or "unknown") for record in records)
 
         for record in records:
             pattern = str(record.get("pattern") or "unknown")
@@ -77,6 +81,22 @@ def cluster_patterns(
             "repositoryCount": len(repo_ids),
             "independentFamilyCount": len(family_ids),
             "evidenceCount": len(records),
+            "cappedEvidenceCount": sum(
+                min(count, MAX_EVIDENCE_PER_REPOSITORY_CONCEPT)
+                for count in repository_evidence_counts.values()
+            ),
+            "dominantRepositoryEvidenceRatio": round(
+                max(repository_evidence_counts.values()) / len(records),
+                4,
+            ) if records else 0.0,
+            "topEvidenceRepositories": [
+                {
+                    "repository": repository,
+                    "evidenceCount": count,
+                    "share": round(count / len(records), 4) if records else 0.0,
+                }
+                for repository, count in repository_evidence_counts.most_common(10)
+            ],
             "numberOfPatterns": len(pattern_counts),
             "entropy": round(entropy, 4),
             "dominantPatternRatio": round(dominant_ratio, 4),

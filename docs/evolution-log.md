@@ -51,3 +51,73 @@ This log records why extraction and analysis logic changes over time.
 - expected effect: Fewer incidental cancellation false positives and more informative clustering of non-POST cancellation variants.
 - actual effect: The final 30-repository Stage-1 run produced 1,907 async-operation records, 138 cancellation records, zero `other-*` pattern buckets, and zero extraction errors.
 - regression added: Tests cover GET incidental cancellation text rejection and PUT stop-route pattern assignment.
+
+## 2026-09-04 — Large corpus discovery command
+
+- problem: The initial implementation only had a fixed 30-repository Stage-1 seed, so it could not directly execute a 5,000-repository corpus.
+- observed failure: A request for 5,000 repositories was answered with a 30-repository run.
+- root cause: Corpus discovery was manual/static instead of generated from GitHub Search shards.
+- change: Added `discover-github`, a resumable GitHub Search API collector that generates large seed files with language/keyword shards and repository metadata.
+- expected effect: Large corpus runs can start from a reproducible 5,000-repository seed rather than hand-written fixtures.
+- actual effect: A 50-repository smoke discovery completed, but exposed SDK/client-heavy results from broad OpenAPI queries.
+- regression added: Discovery tests cover query generation and seed conversion.
+
+## 2026-09-04 — Streaming run resume support
+
+- problem: A 5,000-repository corpus run can be interrupted by network, time, or disk pressure and should not restart from zero.
+- observed failure: The initial streaming mode persisted after each repository but did not skip already processed repositories on rerun.
+- root cause: Streaming execution always initialized in-memory repositories, evidence, and errors as empty lists.
+- change: Streaming mode now loads existing stage outputs by default, skips processed repo IDs, prints per-repository progress, and supports `--fresh` for intentional overwrite.
+- expected effect: Long 5,000-repository runs can be resumed with the same command.
+- actual effect: A 5,000-repository run began and was safely interrupted after six repositories, then prepared for parallel resume.
+- regression added: Existing CLI tests cover command parsing; corpus resume behavior was smoke-tested with two repositories.
+
+## 2026-09-04 — Parallel streaming execution
+
+- problem: Sequential streaming would take too long for 5,000 repository analysis.
+- observed failure: The first 5,000-repository run processed only a few repositories in the first minute.
+- root cause: Clone and extraction were serialized even though repositories are independent units of work.
+- change: Added `--jobs` / `RFC_MINER_JOBS` parallel repository workers while preserving seed-order output writes, configurable flush intervals, and per-repository progress logging.
+- expected effect: Large corpus runs complete materially faster without keeping thousands of checkouts.
+- actual effect: 5,000-repository execution resumed safely from the previous checkpoint; 12-way parallelism is used for the external SSD run.
+- regression added: Resume smoke test validates rerunning the same seed does not duplicate repository records.
+
+## 2026-09-04 — SDK-only discovery filtering
+
+- problem: Broad `openapi` / `swagger` discovery queries returned generated SDKs and API clients that do not provide independent server-side HTTP interaction implementations.
+- observed failure: The first discovery smoke sample included repositories such as API clients and OpenAPI helper libraries.
+- root cause: Discovery accepted search hits based on terms alone instead of requiring server-like metadata and rejecting SDK-only metadata.
+- change: Reordered default query terms toward workflow/orchestration/server concepts and added deterministic metadata filters for SDK/client-only, toy, template, tutorial, prompt-pack, editor-extension, GitHub Action, CLI-only, and over-large candidates.
+- expected effect: The 5,000-repository seed is biased toward API server and orchestration implementations rather than generated-client ecosystems.
+- actual effect: A filtered 5,000-repository seed was generated on external storage with zero `awesome`, `template`, `sample`, `example`, `prompt`, `github-action`, `obsidian`, `comfyui`, or `sdk` substring hits in the seed inspection.
+- regression added: Discovery tests verify SDK-only candidates are excluded and server-like candidates are retained.
+
+## 2026-09-04 — Balanced large-corpus discovery
+
+- problem: The first 5,000-repository discovery reached the target before later languages were searched.
+- observed failure: A sequential language-first query order produced a seed dominated by Go, TypeScript, and Python.
+- root cause: Query generation iterated all terms for one language before moving to the next language.
+- change: Discovery now interleaves query shards by term and language, adds a configurable GitHub repository size cap, and stores `size_kb` in seed records.
+- expected effect: Early target stops still include all configured implementation languages.
+- actual effect: The regenerated 5,000-repository seed spans Go, TypeScript, Python, JavaScript, Rust, Java, C#, PHP, Ruby, Kotlin, Elixir, and Scala.
+- regression added: Discovery tests assert interleaved query order and the size-qualified GitHub Search query.
+
+## 2026-09-04 — Large-corpus clone trimming
+
+- problem: Full default clone behavior wastes bandwidth for large corpus analysis.
+- observed failure: The 5,000-repository run was network-bound even with checkout cleanup enabled.
+- root cause: Shallow clones still fetched tags and did not force single-branch fetches.
+- change: Collection now uses shallow, single-branch, tagless clones for uncached repositories.
+- expected effect: The 5,000-repository corpus run spends less time and bandwidth on irrelevant Git metadata.
+- actual effect: The 5,000-repository external SSD run restarted with the trimmed clone command.
+- regression added: Collector tests assert `--depth`, `--single-branch`, and `--no-tags` are used for fresh clones.
+
+## 2026-09-04 — Final 5,000-repository external SSD run
+
+- problem: The initial 5,000-repository run surfaced extractor and normalization weaknesses that were invisible in the 30-repository corpus.
+- observed failure: Permission-denied files produced duplicate analysis errors, client-side `api.delete(...)` calls were treated as server routes, decorator routes could inherit the previous handler symbol, and `{repo_id:path}` normalized to an invalid extra-brace path.
+- root cause: Repository walking used `Path.rglob` without safe file checks, source-route regexes were not scoped by language/receiver, decorator symbols were searched backward, and colon-style parameters were normalized before brace parameters.
+- change: Added safe filesystem walking, language-scoped route regexes, client-call and test-file exclusion, forward handler lookup for decorators, typed-brace path normalization, and report-level evidence concentration metrics.
+- expected effect: Large corpus runs complete with fewer false positives and expose generated-spec concentration rather than hiding it in raw evidence counts.
+- actual effect: The final run processed 5,000 repositories, found 4,994 independent implementation families, extracted 24,647 evidence records, recorded zero extraction errors, and produced two RFC candidates: `http-async-operation` and `http-cancellation`, both scoring 68.
+- regression added: Tests now cover unreadable repository entries, client-call/test-file skipping, decorator handler attribution, typed brace path normalization, discovery filtering, balanced discovery order, shallow clone flags, and streaming resume.

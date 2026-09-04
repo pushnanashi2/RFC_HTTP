@@ -110,9 +110,8 @@ def classify_route(
     async_in_name = bool(name_segments & ASYNC_NOUNS)
     status_in_path = bool(path_segments & STATUS_WORDS)
     query_action_in_path = bool(path_segments & {"count", "filter", "list", "paginate", "search", "history"})
-    strong_cancel_hit = cancel_in_path or cancel_in_name
 
-    if strong_cancel_hit and async_hit and (method in {"POST", "PUT", "PATCH", "DELETE"} or cancel_in_path):
+    if cancel_in_path and async_hit and (method in {"GET", "POST", "PUT", "PATCH", "DELETE"}):
         concepts.append(
             {
                 "concept": "http-cancellation",
@@ -120,12 +119,20 @@ def classify_route(
                 "reason": "cancel-word-with-async-resource",
             }
         )
-    elif strong_cancel_hit and method in {"POST", "PUT", "PATCH", "DELETE"}:
+    elif cancel_in_path and method in {"GET", "POST", "PUT", "PATCH", "DELETE"}:
         concepts.append(
             {
                 "concept": "http-cancellation",
                 "confidence": 0.78,
                 "reason": "cancel-word",
+            }
+        )
+    elif cancel_in_name and async_in_path and method in {"POST", "PUT", "PATCH", "DELETE"}:
+        concepts.append(
+            {
+                "concept": "http-cancellation",
+                "confidence": 0.7,
+                "reason": "operation-name-cancel-on-async-resource",
             }
         )
     elif method == "DELETE" and bool(path_segments & CANCELABLE_RESOURCE_NOUNS):

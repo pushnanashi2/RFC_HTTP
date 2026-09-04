@@ -37,8 +37,8 @@ def normalize_path(path: str) -> str:
     if not path:
         return "/"
     path = re.sub(r"<(?:[^:<>]+:)?[^<>]+>", "{var}", path)
-    path = re.sub(r":([A-Za-z_][A-Za-z0-9_]*)", "{var}", path)
     path = re.sub(r"\{[^}/]+\}", "{var}", path)
+    path = re.sub(r":([A-Za-z_][A-Za-z0-9_]*)", "{var}", path)
     path = re.sub(r"\([^/]+\)", "{var}", path)
     path = re.sub(r"//+", "/", path)
     if len(path) > 1:
@@ -58,16 +58,19 @@ def assign_pattern(record: dict[str, Any], normalized_path: str) -> tuple[str, s
             str(record.get("extractedValue") or ""),
         ]
     )
+    path_text = " ".join([normalized_path, str(record.get("path") or "")])
 
     if concept == "http-cancellation":
         if method == "POST" and re.search(r"/(?:cancel|abort|stop|terminate|kill)$", normalized_path.lower()):
             return "post-subresource-cancel", "POST action subresource ending in a cancellation verb"
-        if method == "PUT" and re.search(r"/(?:cancel|abort|stop|terminate|kill)$", normalized_path.lower()):
-            return "put-action-cancel", "PUT action subresource ending in a cancellation verb"
-        if method == "GET" and re.search(r"/(?:cancel|abort|stop|terminate|kill)(?:/|$)", normalized_path.lower()):
+        if method == "PUT" and has_cancel_word(path_text):
+            return "put-action-cancel", "PUT route path contains cancellation action wording"
+        if method == "GET" and has_cancel_word(path_text):
             return "get-cancel-link", "GET cancellation link or signed action URL"
         if method == "POST" and has_cancel_word(combined_text):
             return "post-action-cancel", "POST route associated with cancellation wording"
+        if method == "DELETE" and has_cancel_word(path_text):
+            return "delete-action-cancel", "DELETE route path contains cancellation action wording"
         if method == "DELETE" and has_async_noun(combined_text):
             return "delete-operation-resource", "DELETE applied to job/operation-like resource"
         if method == "PATCH" and has_cancel_word(combined_text):

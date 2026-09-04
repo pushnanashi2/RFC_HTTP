@@ -30,12 +30,26 @@ the checkout unless `--keep-repos` is passed. This keeps the Stage-1 corpus
 workable on small disks while preserving reproducible commit hashes.
 
 Large runs can move temporary checkouts and generated data with
-`RFC_MINER_REPO_DIR` and `RFC_MINER_DATA_DIR`.
+`RFC_MINER_REPO_DIR` and `RFC_MINER_DATA_DIR`. Interrupted streaming runs resume
+from existing `repositories.jsonl` records by default; pass `--fresh` to start
+over.
+Set `--jobs` or `RFC_MINER_JOBS` to process multiple repositories in parallel;
+the writer keeps output records sorted by seed order.
+
+GitHub discovery is designed for large, reproducible seeds rather than ad-hoc
+manual lists. Search shards are interleaved by term and language to avoid early
+language bias, and the seed writer rejects obvious non-server repositories such
+as generated SDKs, API clients, templates, tutorials, prompt packs, editor
+extensions, GitHub Actions, and repositories above the configured size cap.
+Collection uses shallow, single-branch, tagless clones and deletes each checkout
+after extraction unless `--keep-repos` is set.
 
 ## Modules
 
 - `rfc_miner.collector`: seed-based GitHub repository collection and commit
   pinning.
+- `rfc_miner.github_discovery`: GitHub Search API discovery for large corpus
+  seed generation.
 - `rfc_miner.extraction`: repository-level orchestration and error capture.
 - `rfc_miner.extractors.openapi`: OpenAPI/Swagger JSON plus lightweight YAML
   operation extraction.

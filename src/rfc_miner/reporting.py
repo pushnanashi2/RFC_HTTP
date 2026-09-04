@@ -137,8 +137,22 @@ def candidate_detail(
     lines.append(f"- Score: {score.get('score', 0)}")
     lines.append(f"- Independent families: {metrics.get('independentFamilyCount', 0)}")
     lines.append(f"- Raw repositories: {metrics.get('repositoryCount', 0)}")
+    lines.append(f"- Evidence records: {metrics.get('evidenceCount', 0)}")
+    lines.append(f"- Capped evidence records: {metrics.get('cappedEvidenceCount', 0)}")
+    lines.append(f"- Dominant repository evidence share: {metrics.get('dominantRepositoryEvidenceRatio', 0)}")
     lines.append(f"- Observed patterns: {metrics.get('numberOfPatterns', 0)}")
     lines.append(f"- Best seeded standards coverage: {comparison.get('bestCoverage', 'unknown')}")
+    lines.append("")
+    lines.append("## Evidence Concentration")
+    lines.append("")
+    for entry in metrics.get("topEvidenceRepositories") or []:
+        lines.append(
+            "- `{repository}`: {count} records, share={share}".format(
+                repository=entry.get("repository"),
+                count=entry.get("evidenceCount"),
+                share=entry.get("share"),
+            )
+        )
     lines.append("")
     lines.append("## Observed Practice")
     lines.append("")

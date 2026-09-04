@@ -5,6 +5,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Callable, Iterable
 
+from ..fs_walk import iter_files
 from ..http_semantics import classify_route
 from ..models import evidence_record
 
@@ -62,17 +63,19 @@ class RoutePattern:
     regex: re.Pattern[str]
     method: Callable[[re.Match[str]], str]
     path: Callable[[re.Match[str]], str]
+    suffixes: frozenset[str] | None = None
 
 
 ROUTE_PATTERNS = [
     RoutePattern(
         "js-router-method",
         re.compile(
-            r"\b(?:app|api|router|routes|server)\.(?P<method>get|post|put|patch|delete)\s*\(\s*[`'\"](?P<path>/[^`'\"]+)[`'\"]",
+            r"(?<!@)\b(?:app|router|routes|server)\.(?P<method>get|post|put|patch|delete)\s*\(\s*[`'\"](?P<path>/[^`'\"]+)[`'\"]",
             re.IGNORECASE,
         ),
         lambda match: match.group("method"),
         lambda match: match.group("path"),
+        frozenset({".cjs", ".js", ".jsx", ".mjs", ".py", ".ts", ".tsx"}),
     ),
     RoutePattern(
         "decorator-method",
@@ -82,6 +85,7 @@ ROUTE_PATTERNS = [
         ),
         lambda match: match.group("method"),
         lambda match: ensure_slash(match.group("path")),
+        frozenset({".java", ".js", ".jsx", ".kt", ".php", ".py", ".rb", ".ts", ".tsx"}),
     ),
     RoutePattern(
         "flask-route-methods",
@@ -91,6 +95,7 @@ ROUTE_PATTERNS = [
         ),
         lambda match: match.group("method"),
         lambda match: match.group("path"),
+        frozenset({".py"}),
     ),
     RoutePattern(
         "spring-short-mapping",
@@ -100,6 +105,7 @@ ROUTE_PATTERNS = [
         ),
         lambda match: match.group("method").removesuffix("Mapping"),
         lambda match: match.group("path"),
+        frozenset({".java", ".kt"}),
     ),
     RoutePattern(
         "spring-request-mapping",
@@ -109,6 +115,7 @@ ROUTE_PATTERNS = [
         ),
         lambda match: match.group("method"),
         lambda match: match.group("path"),
+        frozenset({".java", ".kt"}),
     ),
     RoutePattern(
         "go-chi-gin-method",
@@ -118,6 +125,7 @@ ROUTE_PATTERNS = [
         ),
         lambda match: match.group("method"),
         lambda match: match.group("path"),
+        frozenset({".go"}),
     ),
     RoutePattern(
         "go-handlefunc-method-path",
@@ -127,6 +135,7 @@ ROUTE_PATTERNS = [
         ),
         lambda match: match.group("method"),
         lambda match: match.group("path"),
+        frozenset({".go"}),
     ),
     RoutePattern(
         "rails-route",
@@ -136,6 +145,7 @@ ROUTE_PATTERNS = [
         ),
         lambda match: match.group("method"),
         lambda match: match.group("path"),
+        frozenset({".rb"}),
     ),
 ]
 
@@ -150,13 +160,15 @@ def extract_source_routes(repo: dict[str, Any], repo_root: str | Path) -> list[d
         except OSError:
             continue
         for pattern in ROUTE_PATTERNS:
+            if pattern.suffixes is not None and path.suffix.lower() not in pattern.suffixes:
+                continue
             for match in pattern.regex.finditer(text):
                 method = pattern.method(match).upper()
                 route_path = pattern.path(match)
                 if not route_path.startswith("/"):
                     continue
                 line = line_for_index(text, match.start())
-                symbol = nearest_symbol(text, match.start())
+                symbol = route_symbol(pattern.name, text, match.start(), match.end())
                 operation_text = f"{route_path} {symbol or ''} {route_context(text, match.start())}"
                 response_codes = response_codes_from_text(operation_text)
                 for concept in classify_route(
@@ -195,11 +207,12 @@ def extract_source_routes(repo: dict[str, Any], repo_root: str | Path) -> list[d
 
 
 def iter_source_files(root: Path) -> Iterable[Path]:
-    for path in root.rglob("*"):
-        relative_parts = path.relative_to(root).parts
-        if any(part in IGNORED_DIRS for part in relative_parts):
+    for path in iter_files(root, IGNORED_DIRS):
+        try:
+            is_file = path.is_file()
+        except OSError:
             continue
-        if not path.is_file() or path.suffix.lower() not in SOURCE_SUFFIXES:
+        if not is_file or path.suffix.lower() not in SOURCE_SUFFIXES or is_test_file(path):
             continue
         try:
             if path.stat().st_size > MAX_FILE_BYTES:
@@ -207,6 +220,18 @@ def iter_source_files(root: Path) -> Iterable[Path]:
         except OSError:
             continue
         yield path
+
+
+def is_test_file(path: Path) -> bool:
+    name = path.name.lower()
+    return (
+        name.startswith("test_")
+        or name.endswith("_test.go")
+        or name.endswith("_test.py")
+        or ".test." in name
+        or ".spec." in name
+        or name.endswith("tests.py")
+    )
 
 
 def response_codes_from_text(text: str) -> list[int]:
@@ -246,6 +271,36 @@ def nearest_symbol(text: str, index: int) -> str | None:
     for line in reversed(lines):
         for pattern in patterns:
             match = pattern.search(line)
+            if match:
+                return match.group("symbol")
+    return None
+
+
+def route_symbol(pattern_name: str, text: str, start: int, end: int) -> str | None:
+    if pattern_name in {"decorator-method", "flask-route-methods", "spring-short-mapping", "spring-request-mapping"}:
+        return following_symbol(text, end) or nearest_symbol(text, start)
+    return nearest_symbol(text, start)
+
+
+def following_symbol(text: str, index: int) -> str | None:
+    suffix = text[index:]
+    lines = suffix.splitlines()[:12]
+    patterns = [
+        re.compile(r"\b(?:async\s+)?def\s+(?P<symbol>[A-Za-z_][A-Za-z0-9_]*)"),
+        re.compile(r"\b(?:async\s+)?function\s+(?P<symbol>[A-Za-z_][A-Za-z0-9_]*)"),
+        re.compile(r"\bfunc\s+(?P<symbol>[A-Za-z_][A-Za-z0-9_]*)"),
+        re.compile(r"\b(?:async\s+)?(?P<symbol>[A-Za-z_][A-Za-z0-9_]*)\s*\("),
+        re.compile(
+            r"\b(?:public|private|protected|static|final|suspend|\s)+[A-Za-z0-9_<>, ?]+"
+            r"\s+(?P<symbol>[A-Za-z_][A-Za-z0-9_]*)\s*\("
+        ),
+    ]
+    for line in lines:
+        stripped = line.strip()
+        if not stripped or stripped.startswith("@"):
+            continue
+        for pattern in patterns:
+            match = pattern.search(stripped)
             if match:
                 return match.group("symbol")
     return None

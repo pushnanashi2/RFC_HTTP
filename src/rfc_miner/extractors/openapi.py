@@ -5,6 +5,7 @@ import re
 from pathlib import Path
 from typing import Any, Iterable
 
+from ..fs_walk import iter_files
 from ..http_semantics import classify_route, route_text
 from ..models import evidence_record
 
@@ -29,11 +30,12 @@ def extract_openapi(repo: dict[str, Any], repo_root: str | Path) -> list[dict[st
 
 def iter_openapi_files(root: Path) -> Iterable[Path]:
     ignored = {".git", "node_modules", "vendor", "dist", "build", ".venv", "venv"}
-    for path in root.rglob("*"):
-        relative_parts = path.relative_to(root).parts
-        if any(part in ignored for part in relative_parts):
+    for path in iter_files(root, ignored):
+        try:
+            is_file = path.is_file()
+        except OSError:
             continue
-        if not path.is_file():
+        if not is_file:
             continue
         lowered = path.name.lower()
         if path.suffix.lower() not in {".json", ".yaml", ".yml"}:

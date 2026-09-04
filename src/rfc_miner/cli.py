@@ -8,6 +8,7 @@ from .clustering import cluster_patterns
 from .collector import collect_repositories
 from .deduplication import dedupe_repositories
 from .extraction import analyze_repositories
+from .github_discovery import discover_github_repositories
 from .normalization import normalize_evidence
 from .paths import data_paths
 from .reporting import write_report
@@ -24,6 +25,16 @@ DEFAULT_STANDARDS_REL = Path("config") / "standards" / "http-api-seed.json"
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="rfc-miner")
     subcommands = parser.add_subparsers(dest="command", required=True)
+
+    discover = subcommands.add_parser("discover-github", help="discover GitHub repositories for a large corpus seed")
+    add_common(discover)
+    discover.add_argument("--output", default="data/raw/github-discovered-seed.json")
+    discover.add_argument("--target", type=int, default=5000)
+    discover.add_argument("--min-stars", type=int, default=20)
+    discover.add_argument("--updated-since", default="2024-01-01")
+    discover.add_argument("--per-query-limit", type=int, default=200)
+    discover.add_argument("--max-size-kb", type=int, default=250_000)
+    discover.add_argument("--fresh", action="store_true")
 
     collect = subcommands.add_parser("collect", help="collect and pin repositories")
     add_common(collect)
@@ -68,6 +79,9 @@ def build_parser() -> argparse.ArgumentParser:
     run.add_argument("--skip-collect", action="store_true")
     run.add_argument("--no-clone", action="store_true")
     run.add_argument("--keep-repos", action="store_true")
+    run.add_argument("--fresh", action="store_true")
+    run.add_argument("--jobs", type=int, default=int(os.environ.get("RFC_MINER_JOBS", "1")))
+    run.add_argument("--flush-interval", type=int, default=int(os.environ.get("RFC_MINER_FLUSH_INTERVAL", "25")))
 
     return parser
 
@@ -101,6 +115,19 @@ def main(argv: list[str] | None = None) -> int:
             clone=not args.no_clone,
         )
         print(f"collected repositories: {len(records)}")
+        return 0
+
+    if args.command == "discover-github":
+        result = discover_github_repositories(
+            output_path=args.output,
+            target=args.target,
+            min_stars=args.min_stars,
+            updated_since=args.updated_since,
+            per_query_limit=args.per_query_limit,
+            max_size_kb=args.max_size_kb,
+            resume=not args.fresh,
+        )
+        print(f"discovered repositories: {len(result.get('repositories', []))}; output: {args.output}")
         return 0
 
     if args.command == "analyze":
@@ -160,6 +187,9 @@ def main(argv: list[str] | None = None) -> int:
                     repo_dir=args.repo_dir,
                     limit=args.limit,
                     keep_repos=args.keep_repos,
+                    resume=not args.fresh,
+                    jobs=args.jobs,
+                    flush_interval=args.flush_interval,
                 )
             repositories_path = None
         else:
