@@ -144,5 +144,7 @@ evidence, independent-family counts, and strict scores for RFC triage.
 - `docs/research-design.md`
 - `docs/architecture.md`
 - `docs/evolution-log.md`
+- `docs/prior-art/http-cancellation.md`
+- `docs/drafts/http-operation-cancellation-outline.md`
 - `docs/runs/2026-09-04-5000-final.md`
 - `docs/runs/2026-09-04-5000-analysis.md`

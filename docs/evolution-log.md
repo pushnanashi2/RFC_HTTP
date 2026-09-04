@@ -141,3 +141,13 @@ This log records why extraction and analysis logic changes over time.
 - expected effect: Server-side route evidence increases for C#, PHP, and Elixir without admitting generic client calls.
 - actual effect: The refined 5,000-repository run found 216 Laravel route records across 20 repositories, 30 Phoenix route records across 3 repositories, and 18 ASP.NET minimal API records across 5 repositories.
 - regression added: Tests cover ASP.NET grouped routes, Laravel relative/prefixed routes, handler-name cancellation, Phoenix scope prefixes, and non-router Elixir client-call rejection.
+
+## 2026-09-04 — Cancellation-first draft framing
+
+- problem: The first analysis framed cancellation primarily as narrower and less covered, which underweighted the strongest IETF argument.
+- observed failure: Review noted that the corpus already shows convergence on `POST /.../{id}/cancel`, so the missing piece is semantics rather than endpoint shape.
+- root cause: The analysis treated async overlap mostly as composability evidence and did not foreground the counterargument that cancellation could be an operation-resource affordance.
+- change: Reframed the analysis around de facto shape convergence, added denominator caveats, labeled pattern counts as memberships, added a prior-art matrix, and created a cancellation-first Internet-Draft outline.
+- expected effect: The next draft pitch can argue for standardizing observed semantics without overstating prevalence or proposing a new route shape.
+- actual effect: The current recommendation is to validate TP/FP samples first, then pursue `http-cancellation` as either a standalone cancellation profile or a section in a broader operation-resource draft.
+- regression added: Documentation now links the refined 5,000-repository results to prior art and a concrete draft outline.
