@@ -7,9 +7,8 @@
     "domain-transition-risk": 69,
     "mixed-operation-target-and-risk": 18,
     "mixed-same-resource-and-risk": 32,
-    "operation-like-target": 38,
-    "other": 7,
-    "same-resource-linked": 132
+    "operation-like-target": 21,
+    "same-resource-linked": 156
   },
   "byPattern": {
     "delete-action-cancel": 31,
@@ -21,13 +20,13 @@
     "put-action-cancel": 27
   },
   "bySourceKind": {
-    "openapi": 84,
-    "source": 212
+    "openapi": 85,
+    "source": 211
   },
   "bySourceKindByPattern": {
     "openapi": {
       "delete-action-cancel": 15,
-      "delete-operation-resource": 26,
+      "delete-operation-resource": 27,
       "get-cancel-link": 6,
       "patch-state-cancelled": 3,
       "post-action-cancel": 5,
@@ -36,7 +35,7 @@
     },
     "source": {
       "delete-action-cancel": 16,
-      "delete-operation-resource": 74,
+      "delete-operation-resource": 73,
       "get-cancel-link": 12,
       "patch-state-cancelled": 2,
       "post-action-cancel": 30,
@@ -46,21 +45,22 @@
   },
   "cellRouteCounts": {
     "distribution": {
-      "1": 150,
+      "1": 159,
       "10": 2,
+      "11": 1,
       "12": 1,
-      "2": 76,
-      "3": 28,
+      "2": 67,
+      "3": 31,
       "4": 17,
-      "5": 8,
-      "6": 9,
-      "7": 1,
+      "5": 5,
+      "6": 7,
+      "7": 2,
       "8": 3,
       "9": 1
     },
-    "extraRouteLabelsIfClusterCensus": 324,
+    "extraRouteLabelsIfClusterCensus": 315,
     "selectedCells": 296,
-    "selectedRouteRecords": 620
+    "selectedRouteRecords": 611
   },
   "estimationGuidance": {
     "ambiguous": "Report ambiguous-as-false-positive and ambiguous-as-true-positive bounds, plus an explicit non-ambiguous rate.",
@@ -72,7 +72,7 @@
   },
   "populationFamilyMembershipsByPattern": {
     "delete-action-cancel": 31,
-    "delete-operation-resource": 209,
+    "delete-operation-resource": 184,
     "get-cancel-link": 18,
     "patch-state-cancelled": 5,
     "post-action-cancel": 106,
@@ -89,7 +89,7 @@
     "frameSnapshotHash": "36035d4b0fc6d94b0342fe196b20d4ff4ac26c6fb44d607e9909d4acf4f07da5",
     "pythonVersion": "3.10.12",
     "routeId": "sha256(repository, httpMethod, normalizedPath-or-path)",
-    "samplingCodeCommit": "1e5a293639ca061e68285c87dbc83797e1256bc6",
+    "samplingCodeCommit": "dfff3b1d0174fc09924e48147f10a41b53496245",
     "seed": 20260904
   }
 }

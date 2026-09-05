@@ -2,514 +2,427 @@
 
 Status: draft for pre-Internet-Draft validation.
 
-## Goal
+This protocol validates whether detected `http-cancellation` evidence represents
+operation cancellation rather than ordinary domain state transitions or resource
+deletion. It is intentionally narrower than a prevalence study: it validates the
+evidence used to motivate a possible Internet-Draft, and it does not turn the
+sample into a claim about all HTTP APIs.
 
-Estimate how much detected `http-cancellation` evidence is actually operation
-cancellation rather than business-domain cancellation.
+## 1. Estimation Targets
 
-The protocol is designed to protect the Internet-Draft motivation from the
-largest precision risk: routes such as `POST /subscriptions/{id}/cancel`,
-`POST /orders/{id}/cancel`, and `POST /bookings/{id}/cancel` have the same shape
-as `POST /jobs/{id}/cancel`, but can represent ordinary domain state
-transitions.
+The primary inference target is precision over sampled `family_id` × `pattern`
+cells, expanded to all cancellation route records inside each selected cell.
 
-## Sampling Frame
+A cell is one independent implementation family and one detected cancellation
+pattern. The selected cell is labeled by auditing every route record in that
+cell. This is a stratified cluster sample: the first-stage unit is the
+family-pattern cell, and the second-stage route records inside a selected cell
+are included as a census.
 
-Input:
+The protocol reports three separate layers:
+
+| Layer | Unit | Use |
+| --- | --- | --- |
+| Strict cancellation frame | `family_id` × strict pattern cell | Primary operation-vs-domain validation |
+| Linked `delete-operation-resource` audit | `family_id` × `delete-operation-resource` cell with same-resource async linkage | Promotion audit for the weak DELETE heuristic |
+| Async-family linkage envelope | async-operation family | Motivation guardrail only, not estimated by this sample |
+
+Do not report a single pooled TP rate over all rows. Route rows inside one cell
+are correlated because they share the same repository, family, pattern, and API
+design. The effective sample size is therefore closer to the number of selected
+cells than to the number of labeled route records.
+
+The sample cannot estimate unique-family prevalence over the 407 strict
+cancellation families. Pattern-family cells are non-exclusive, and families with
+multiple patterns have multiple inclusion paths.
+
+## 2. Frames and Strata
+
+All counts below use the normalized 5,000-repository snapshot after deterministic
+primary-pattern assignment. If the same route has multiple detected cancellation
+patterns, the strict explicit-cancel pattern wins over the weaker
+`delete-operation-resource` heuristic.
+
+Input frame:
 
 - normalized evidence: `/mnt/cash-data/rfc-http-miner/data-5000-refined/normalized/evidence.jsonl`
 - family map: `/mnt/cash-data/rfc-http-miner/data-5000-refined/normalized/families.jsonl`
 - clusters: `/mnt/cash-data/rfc-http-miner/data-5000-refined/results/clusters.json`
 
-Generate the primary route-record sheet:
+Generated validation artifacts:
 
-```bash
-rfc-miner sample-cancellation-routes \
-  --data-dir /mnt/cash-data/rfc-http-miner/data-5000-refined \
-  --profile full
+| Artifact | Rows | Purpose |
+| --- | ---: | --- |
+| `docs/validation/http-cancellation-sample-2026-09-04.csv` | 296 cells | Cell-level sample and machine metadata |
+| `docs/validation/http-cancellation-cell-route-sample-2026-09-04.csv` | 611 route rows | All route records inside selected cells |
+| `docs/validation/http-cancellation-cell-route-labeling-view-2026-09-04.csv` | 611 route rows | Blinded reviewer worksheet |
+| `docs/validation/http-cancellation-cell-route-machine-columns-2026-09-04.csv` | 611 route rows | Hidden machine columns keyed by `evidence_id` |
+| `docs/validation/http-cancellation-family-sample-2026-09-04.csv` | 140 families | Descriptive strict-family sensitivity sample |
+| `docs/validation/http-cancellation-route-sample-2026-09-04.csv` | 377 routes | Descriptive route-frame sensitivity sample |
+
+Strict cancellation cell frame:
+
+| Pattern | Population cells | Sampled cells | Cell sampling fraction | Route records in selected cells |
+| --- | ---: | ---: | ---: | ---: |
+| `post-subresource-cancel` | 330 | 80 | 24.2% | 215 |
+| `post-action-cancel` | 106 | 35 | 33.0% | 65 |
+| `delete-action-cancel` | 31 | 31 | 100.0% | 39 |
+| `put-action-cancel` | 27 | 27 | 100.0% | 47 |
+| `get-cancel-link` | 18 | 18 | 100.0% | 33 |
+| `patch-state-cancelled` | 5 | 5 | 100.0% | 8 |
+| **Strict total** | **517** | **196** | — | **407** |
+
+Linked `delete-operation-resource` audit frame:
+
+| Bucket | Population cells | Sampled cells | Cell sampling fraction | Route records in selected cells |
+| --- | ---: | ---: | ---: | ---: |
+| `delete-only-linked` | 88 | 70 | 79.5% | 143 |
+| `delete-and-strict-different-resource` | 47 | 15 | 31.9% | 36 |
+| `delete-and-strict-same-resource` | 49 | 15 | 30.6% | 25 |
+| `delete-unlinked` | 24 | 0 | 0.0% | 0 |
+| **Linked DELETE audit total** | **184** | **100** | — | **204** |
+
+The full observed cancellation membership frame contains 725 cells: 517 strict
+cells plus 208 `delete-operation-resource` cells. The inferential validation
+frame in this protocol is 701 cells: 517 strict cells plus the 184 linked
+`delete-operation-resource` audit cells. The 24 unlinked DELETE cells are
+descriptive only because they do not affect the operation-resource linkage
+envelope.
+
+## 3. Resource-Level Linkage Envelope
+
+The Internet-Draft motivation must keep the sampling frame separate from the
+async-family denominator. The linkage envelope uses 631 async-operation families:
+
+| Component | Families | Denominator | Share |
+| --- | ---: | ---: | ---: |
+| Strict explicit-cancel families with same-resource async linkage | 194 | 631 | 30.7% |
+| Linked `delete-operation-resource` families after primary-pattern assignment | 184 | 631 | 29.2% |
+| Family-level overlap between the two linked sets | 96 | 631 | 15.2% |
+| Union of the two linked sets | 282 | 631 | 44.7% |
+
+The family-level structural envelope is therefore 194/631 to 282/631 before
+manual labels. The upper end is not `194 + 184`; overlap families prevent double
+counting.
+
+Resource-level overlap is smaller than family-level overlap:
+
+| Component | Operation resources |
+| --- | ---: |
+| Strict linked operation resources | 300 |
+| DELETE linked operation resources | 362 |
+| Same operation resource in both sets | 57 |
+| Resource-level union | 605 |
+
+Among `delete-operation-resource` cells, 49 families have a DELETE route on the
+same operation resource as an explicit strict cancel route, while 47 have strict
+cancel evidence elsewhere in the same family. This distinction is used for
+DELETE audit allocation, but it does not change the family-level upper envelope:
+families already counted by the strict lower subset remain counted once.
+
+## 4. Primary-Pattern Assignment and Identifiers
+
+Primary-pattern assignment removes cross-pattern route duplication before
+sampling. The priority order is:
+
+1. `post-subresource-cancel`
+2. `post-action-cancel`
+3. `delete-action-cancel`
+4. `put-action-cancel`
+5. `get-cancel-link`
+6. `patch-state-cancelled`
+7. `delete-operation-resource`
+
+The current raw frame had three route IDs with more than one pattern. After
+primary-pattern assignment, all generated CSVs have zero cross-pattern
+`route_id` duplicates. Same-pattern `source` and `openapi` evidence may still
+share a `route_id`; those are independent evidence rows for the same route and
+are joined by `evidence_id`.
+
+Identifiers:
+
+| Column | Definition | Scope |
+| --- | --- | --- |
+| `route_id` | `sha256(repository, httpMethod, normalizedPath-or-path)` | Stable route identity across commits |
+| `evidence_id` | `sha256(route_id, commit, pattern, sourceKind, path, file, lineStart, symbol)` | Stable join key for one sample evidence row |
+
+`evidence_id` is not a raw extractor record identifier. It identifies one
+normalized sample evidence row and is the join key between the blinded worksheet
+and the machine-column table.
+
+Sampling provenance is stored in each `.summary.json` sidecar rather than in
+every CSV row. The current cell sample summary records:
+
+- `seed`: `20260904`
+- `samplingCodeCommit`: `dfff3b1d0174fc09924e48147f10a41b53496245`
+- `pythonVersion`: `3.10.12`
+- `frameSnapshotHash`: `36035d4b0fc6d94b0342fe196b20d4ff4ac26c6fb44d607e9909d4acf4f07da5`
+
+## 5. Selection Rules
+
+The representative cell sheet is deterministic for the same frame, seed, Python
+version, and sampling code commit.
+
+Cell selection:
+
+- sample within pattern or DELETE-audit bucket;
+- sort family IDs before shuffling;
+- shuffle with `random.Random(f"{seed}:{pattern}:{bucket}")`;
+- cap each repository at two rows per pattern and five rows total;
+- for `delete-operation-resource`, sample 70 cells from `delete-only-linked`,
+  15 from `delete-and-strict-different-resource`, and 15 from
+  `delete-and-strict-same-resource`.
+
+Representative route selection inside a selected cell:
+
+- sort candidate route rows by stable identity fields;
+- select one row uniformly with `random.Random(f"{seed}:cell-route:{pattern}:{family_id}")`;
+- do not prefer route-level async linkage, HTTP `202`, `sourceKind`, or
+  confidence.
+
+The representative row exists for inspection and reproducibility. It is not the
+only labeled record. The companion cell-route sheet includes every cancellation
+route record in every selected cell.
+
+## 6. Label Taxonomies
+
+Use one taxonomy for strict cancellation cells and a separate taxonomy for
+`delete-operation-resource` cells.
+
+Strict operation-vs-domain taxonomy:
+
+- `operation-cancellation`: the route cancels an observable operation, job, task,
+  run, execution, workflow, build, deployment, pipeline, export, import, backup,
+  restore, sync, scan, render, transcode, training, migration, index, provision,
+  snapshot, report, query, status monitor, or equivalent operation handle.
+- `domain-state-transition`: the route cancels a business object such as a
+  subscription, order, booking, plan, invoice, reservation, account, request, or
+  membership.
+- `ambiguous`: the available route, operation name, response semantics, and
+  bounded adjacent context do not prove which of the two applies.
+
+DELETE audit taxonomy:
+
+- `cancellation`: the DELETE route requests cancellation of an ongoing operation.
+- `deletion-or-archival`: the DELETE route removes, archives, garbage-collects,
+  or forgets an operation resource after or independent of execution.
+- `ambiguous`: the available evidence does not distinguish cancellation from
+  deletion, archival, or garbage collection.
+
+When reporting DELETE audit TP-style rates, map `cancellation` to the positive
+class, map `deletion-or-archival` to the negative class, and apply the ambiguity
+bounds below to `ambiguous`.
+
+Path nouns alone are never sufficient. If the evidence does not settle the
+semantics, choose `ambiguous`.
+
+## 7. Blinded Labeling Procedure
+
+Labelers use
+`docs/validation/http-cancellation-cell-route-labeling-view-2026-09-04.csv`.
+Machine-generated columns are physically separated into
+`docs/validation/http-cancellation-cell-route-machine-columns-2026-09-04.csv`.
+Join the two files only after final labels are recorded.
+
+Hidden from labelers during the first pass:
+
+- `pattern`
+- `routeStratum`
+- `linkageBucket`
+- `deleteOperationResourceBucket`
+- `familyPatternHasSameResourceLinked`
+- `familyPatternHasOperationTarget`
+- `familyPatternHasDomainTransitionRisk`
+- `routeLevelOperationLinked`
+- `operationTarget`
+- `domainTransitionRisk`
+- `confidence`
+- `cancelTargetPath`
+- precomputed adjacent-linkage evidence
+
+Visible reviewer context:
+
+- `repository`
+- `commit`
+- `httpMethod`
+- `normalizedPath`
+- original `path`
+- `sourceKind`
+- `file`
+- `lineStart`
+- `symbol`
+- `responseCodes`
+- bounded response semantics evidence
+
+Workflow:
+
+1. Produce an LLM draft label for each route row using only the blinded evidence
+   packet for that row.
+2. Require a verbatim quote from the evidence packet and a one-sentence rationale.
+3. Verify mechanically that each quoted string exists in the packet.
+4. Human-adjudicate every labeled route row.
+5. Aggregate route labels back to `cell_sample_id` before computing cell-stratum
+   estimates.
+
+The worksheet contains an `unanchored_subset` marker for 80 sampled cells. For
+those cells, human reviewers must not see the LLM draft before recording
+independent labels. Use that subset to estimate anchoring effects and
+human-human agreement.
+
+## 8. Adjudication and Agreement
+
+All route rows require a final adjudicated label before estimator scripts run.
+Only `final_label` counts for estimation.
+
+Recommended worksheet fields:
+
+- `draft_label`
+- `draft_quote`
+- `draft_rationale`
+- `labeler_a_label`
+- `labeler_a_quote`
+- `labeler_a_rationale`
+- `labeler_b_label`
+- `labeler_b_quote`
+- `labeler_b_rationale`
+- `final_label`
+- `adjudicator`
+- `changed_from_draft`
+- `note`
+
+Report agreement separately from sampling uncertainty:
+
+- LLM draft vs final human label over all rows;
+- human-human raw agreement and Cohen's kappa on the 80-cell unanchored subset;
+- disagreement counts by stratum and taxonomy.
+
+Kappa is a reliability diagnostic, not a pass/fail threshold.
+
+## 9. Estimators and Intervals
+
+Because the design is a stratified cluster sample, do not use pooled
+Clopper-Pearson, Wilson, or Wald intervals over route rows.
+
+For each stratum `h`, selected cell `i`, and route record `j`:
+
+- `m_hi`: number of labeled route records in selected cell `i`;
+- `y_hij`: positive-class indicator for route `j`;
+- `Y_hi = Σ_j y_hij`;
+- `R_h = Σ_i Y_hi / Σ_i m_hi`.
+
+`R_h` is a route-ratio estimator within sampled cells. It is not the simple
+average of cell-level proportions when cell sizes differ.
+
+For the strict overall estimate, combine strict strata with known frame totals.
+For the linked DELETE audit, combine the three linked DELETE buckets separately.
+Do not combine DELETE audit rows into the strict denominator unless the strict
+definition is explicitly changed.
+
+Ambiguity bounds:
+
+| Variant | Positive numerator |
+| --- | --- |
+| `ambiguous_excluded` | positives among non-ambiguous rows only |
+| `ambiguous_as_fp` | positives, with ambiguous rows counted negative |
+| `ambiguous_as_tp` | positives plus ambiguous rows |
+
+Intervals:
+
+- primary interval: stratified cluster bootstrap;
+- resample selected cells with replacement inside each non-census stratum;
+- keep all route records in a resampled cell together;
+- keep census strata fixed because their cell-selection variance is zero;
+- use 5,000 bootstrap replicates by default;
+- report percentile 95% intervals for each ambiguity variant.
+
+The census strata are:
+
+- `delete-action-cancel`
+- `put-action-cancel`
+- `get-cancel-link`
+- `patch-state-cancelled`
+
+The non-census strict strata are:
+
+- `post-subresource-cancel`
+- `post-action-cancel`
+
+The non-census DELETE audit strata are:
+
+- `delete-only-linked`
+- `delete-and-strict-different-resource`
+- `delete-and-strict-same-resource`
+
+Report ICC and design effect for each stratum and ambiguity variant:
+
+```text
+DEFF_h = 1 + (mean_cluster_size_h - 1) * ICC_h
+effective_n_h = labeled_route_records_h / DEFF_h
 ```
 
-Default output:
+ICC and DEFF are findings, not mere diagnostics. If ICC is high, cell-level
+semantics dominate and the cluster design is justified. If ICC is low,
+family-pattern cells hide meaningful route-level heterogeneity.
 
-- `/mnt/cash-data/rfc-http-miner/data-5000-refined/results/validation/http-cancellation-route-sample.csv`
-- `/mnt/cash-data/rfc-http-miner/data-5000-refined/results/validation/http-cancellation-route-sample.summary.json`
+## 10. Role of Other Samples
 
-Generate the support pattern-family sheet:
+The 140-row strict-family sample and 377-row route-record sample are descriptive
+sensitivity artifacts.
+
+Use them for:
+
+- sanity-checking whether conclusions change under a different unit;
+- inspecting generated-catalog concentration;
+- motivating extractor improvements;
+- selecting examples for the draft.
+
+Do not use them to replace the primary 296-cell cluster design unless the
+protocol is revised and the estimand is changed.
+
+## 11. Known Limitations
+
+- The protocol estimates evidence precision for the current detection frame, not
+  prevalence among all HTTP APIs.
+- The async-family denominator is 631 families; the validation frame is 701
+  sampled-eligible cells. Keep these denominators separate.
+- Route rows inside a cell can contain mixed operation and domain semantics; the
+  all-routes companion sheet measures that mixing directly for selected cells.
+- The unlinked 24 `delete-operation-resource` cells are not part of the linked
+  DELETE promotion audit.
+- Same-pattern `source` and `openapi` rows can share a `route_id`; use
+  `evidence_id` for worksheet joins.
+- Cross-pattern route duplication was rare in the raw frame and is removed by
+  deterministic primary-pattern assignment before sampling.
+- Labeling uncertainty is separate from sampling uncertainty; report agreement
+  and anchoring diagnostics alongside confidence intervals.
+
+## 12. Reproduction Commands
+
+Generate the primary cell sheet:
 
 ```bash
 rfc-miner sample-cancellation \
   --data-dir /mnt/cash-data/rfc-http-miner/data-5000-refined \
-  --profile full
+  --profile full \
+  --output docs/validation/http-cancellation-sample-2026-09-04.csv
 ```
 
-Default output:
-
-- `/mnt/cash-data/rfc-http-miner/data-5000-refined/results/validation/http-cancellation-sample.csv`
-- `/mnt/cash-data/rfc-http-miner/data-5000-refined/results/validation/http-cancellation-sample.summary.json`
-
-Current generated snapshot:
-
-- `docs/validation/http-cancellation-route-sample-2026-09-04.csv`
-- `docs/validation/http-cancellation-route-sample-2026-09-04.summary.json`
-- `docs/validation/http-cancellation-sample-2026-09-04.csv`
-- `docs/validation/http-cancellation-sample-2026-09-04.summary.json`
-- `docs/validation/http-cancellation-family-sample-2026-09-04.csv`
-- `docs/validation/http-cancellation-family-sample-2026-09-04.summary.json`
-
-Sampling unit:
-
-- primary route sheet: one deduplicated cancellation route record. Route
-  strata are exclusive in this sheet, so a route-record TP rate can be estimated
-  with ordinary stratum weights.
-- support pattern sheet: one `family_id` × `pattern` membership, represented by
-  the highest-quality evidence record for that membership.
-- family denominator sheet: one strict cancellation `family_id`, represented by
-  the highest-quality strict cancellation evidence record for that family.
-- the support pattern sheet must not contain two rows with the same `family_id`
-  and `pattern`; the family sheet must not contain two rows with the same
-  `family_id`.
-- the route sheet estimates route-record precision. It does not update the 407
-  strict unique-family denominator.
-- the support pattern sheet estimates pattern-family membership precision. It
-  does not estimate route-record precision or unique-family prevalence.
-
-Primary population:
-
-- strict cancellation patterns:
-  - `post-subresource-cancel`
-  - `post-action-cancel`
-  - `put-action-cancel`
-  - `get-cancel-link`
-  - `patch-state-cancelled`
-  - `delete-action-cancel`
-
-Secondary audit population:
-
-- `delete-operation-resource`, because it has the strongest route-level linkage
-  signal but is semantically ambiguous without explicit cancel wording.
-  Its operation-like-target and domain-transition-risk counts are mostly
-  definition-derived, so the informative pre-sampling signal is same-resource
-  async linkage.
-
-## Operation-Resource Denominator
-
-Strict/non-strict scoring is orthogonal to operation-vs-domain semantics. The
-Internet-Draft motivation should therefore describe an operation-resource
-linkage envelope before any single prevalence claim:
-
-| Component | Families | Async-operation denominator | Share | Use |
-| --- | ---: | ---: | ---: | --- |
-| Strict explicit-cancel routes with same-resource async linkage | 194 | 631 | 30.7% | lower structural subset |
-| `delete-operation-resource` routes with same-resource async linkage | 185 | 631 | 29.3% | promotion-audit swing factor |
-| Overlap between those linked sets | 97 | 631 | 15.4% | prevents double counting |
-| Union of strict-linked and delete-linked sets | 282 | 631 | 44.7% | pre-label upper structural envelope |
-
-The earlier maximum `194 + 185 = 379` is not a defensible upper bound because 97
-families are in both linked sets. The current structural envelope is therefore
-194/631 to 282/631 before manual labels. Treat this as a linkage envelope, not
-as a true-positive rate.
-
-## Current Route-Record Primary Strata
-
-The primary sheet uses exclusive route-record strata. This is the only current
-sample whose design supports one weighted operation-cancellation TP estimate
-over cancellation route records.
-
-| Route stratum | Population route records | Sampled route records | Sampling fraction | Estimation role |
-| --- | ---: | ---: | ---: | --- |
-| `delete-operation-resource:any` | 468 | 100 | 21.4% | largest swing factor for the operation-resource envelope |
-| `post-subresource-cancel:linked` | 257 | 30 | 11.7% | already same-resource linked |
-| `post-subresource-cancel:unlinked` | 617 | 70 | 11.3% | dominant domain-transition-risk queue |
-| `post-action-cancel:any` | 189 | 50 | 26.5% | secondary explicit-cancel shape |
-| `delete-action-cancel:any` | 39 | 39 | 100.0% | full census |
-| `put-action-cancel:any` | 47 | 47 | 100.0% | full census |
-| `get-cancel-link:any` | 33 | 33 | 100.0% | full census |
-| `patch-state-cancelled:any` | 8 | 8 | 100.0% | full census |
-
-Total current route-record sample size: 377 rows over 1,658 deduplicated
-cancellation route records. The `post-subresource-cancel` split intentionally
-spends more reviewer effort on unlinked records, where operation-vs-domain
-semantics cannot be inferred from structure alone.
-
-## Current Family-Pattern Support Strata
-
-Rows are non-exclusive pattern-family memberships. Do not compare the sum of
-membership rows to the 407 unique strict cancellation families. The membership
-sum is valid only as the 517-row sampling-frame size for the support
-pattern-family sheet. Sampling fractions intentionally vary by stratum, so a raw
-pooled TP rate from the 260 rows is invalid.
-
-| Pattern | Population family memberships | Same-resource linked families | Operation target families | Domain-transition-risk families | Sampled representatives | Sampling fraction | Estimation population |
-| --- | ---: | ---: | ---: | ---: | ---: | ---: | --- |
-| `post-subresource-cancel` | 330 | 155 | 180 | 242 | 80 | 24.2% | strict cancellation |
-| `post-action-cancel` | 106 | 31 | 35 | 80 | 50 | 47.2% | strict cancellation |
-| `delete-action-cancel` | 31 | 19 | 24 | 8 | 30 | 96.8% | strict cancellation |
-| `put-action-cancel` | 27 | 7 | 10 | 21 | 27 | 100.0% | strict cancellation |
-| `get-cancel-link` | 18 | 4 | 5 | 15 | 18 | 100.0% | strict cancellation |
-| `patch-state-cancelled` | 5 | 1 | 2 | 3 | 5 | 100.0% | strict cancellation |
-| `delete-operation-resource` | 209 | 185 | 202 | 0 | 50 | 23.9% | promotion audit |
-
-Total proposed sample size: 260 family-pattern representative rows. The strict
-sample is 210 rows drawn from 517 strict pattern-family memberships. The
-`delete-operation-resource` audit is 50 rows drawn from a separate 209-membership
-population.
-
-For `delete-operation-resource`, use the 185/209 same-resource linkage as the
-reason to sample the bucket. Do not treat 202/209 operation-like target or zero
-domain-transition risk as independent evidence of precision.
-
-If reviewer time is constrained, use a 140-row minimum pattern-family sample:
-
-| Pattern | Minimum sample |
-| --- | ---: |
-| `post-subresource-cancel` | 50 |
-| `post-action-cancel` | 30 |
-| `delete-action-cancel` | 20 |
-| `put-action-cancel` | 15 |
-| `get-cancel-link` | 10 |
-| `patch-state-cancelled` | 5 |
-| `delete-operation-resource` | 10 |
-
-## Unique-Family Denominator Sample
-
-The pattern-family sheet must not be used to update the 407-family denominator,
-because a family with multiple strict patterns has multiple chances to be
-sampled and may be more likely to be a true operation-cancellation API.
-
-Generate a separate unique-family sheet before making claims over the 407 strict
-cancellation families:
+Generate all route rows inside selected cells:
 
 ```bash
-rfc-miner sample-cancellation-family \
+rfc-miner sample-cancellation-cell-routes \
   --data-dir /mnt/cash-data/rfc-http-miner/data-5000-refined \
-  --profile full
+  --profile full \
+  --output docs/validation/http-cancellation-cell-route-sample-2026-09-04.csv
 ```
 
-Current generated snapshot:
+Generate blinded reviewer and machine-column files:
 
-| Sheet | Population | Sample | Sampling fraction | Use |
-| --- | ---: | ---: | ---: | --- |
-| `docs/validation/http-cancellation-family-sample-2026-09-04.csv` | 407 strict families | 140 families | 34.4% | update unique-family claims |
-
-Use this sheet, not the pattern-family sheet, when updating the 407 / 194 / 222
-family-level claims. The family-level primary label means: this family exposes
-at least one true operation-cancellation affordance among its strict cancellation
-evidence.
-
-The pattern-family sheet includes an exploratory
-`strictFamilyApproxInclusionProbability` column using:
-
-```text
-pi_family ≈ 1 - product(1 - f_pattern)
+```bash
+rfc-miner split-cancellation-labeling-view \
+  --data-dir /mnt/cash-data/rfc-http-miner/data-5000-refined \
+  --input docs/validation/http-cancellation-cell-route-sample-2026-09-04.csv \
+  --labeling-output docs/validation/http-cancellation-cell-route-labeling-view-2026-09-04.csv \
+  --machine-output docs/validation/http-cancellation-cell-route-machine-columns-2026-09-04.csv \
+  --unanchored-size 80
 ```
-
-where `f_pattern` is the observed sampling fraction for each strict pattern
-present in that family. Treat this only as a sensitivity check: bucket quotas and
-repository caps make the exact design probability more complex than the simple
-formula.
-
-## Secondary Repository Stratification
-
-Sampling must avoid letting one large repository or generated catalog dominate a
-pattern stratum.
-
-Rules:
-
-- sample families first, then choose one evidence record per selected family;
-- cap each repository at two samples per pattern;
-- cap each repository at five total samples across the whole sheet;
-- preserve both `openapi` and `source` examples when they expose materially
-  different route evidence;
-- if a cap prevents filling a stratum, continue with the next random family in
-  that pattern.
-
-For generated catalog audits, run a separate concentration sample rather than
-relaxing these caps.
-
-The current pattern-family representative design satisfies the anti-domination
-requirement for each pattern stratum: a single repository/family can contribute
-at most one row to a given pattern before repository caps are applied.
-
-The route-record sheet intentionally does not apply those family caps because
-it estimates a route-record population with known stratum inclusion
-probabilities. Report repository concentration for route-record labels
-separately, and do not translate route-record precision into family prevalence.
-
-## Linkage Sub-Strata
-
-Within each pattern, sample across route-level buckets when available:
-
-- same-resource async linked;
-- operation-like target without same-resource linkage;
-- domain-transition risk;
-- mixed same-resource/risk or operation-target/risk, where one family-pattern
-  contains both operation-looking and domain-looking cancellation records.
-
-For the route-record sheet, split `post-subresource-cancel` into linked and
-unlinked strata. The full profile samples 30 linked records and 70 unlinked
-records, because the unlinked side contains most of the domain-transition-risk
-work.
-
-For small strata, include all available representative rows and mark the missing linkage
-buckets as empty rather than oversampling another bucket without notation.
-
-## Labels
-
-Use exactly one primary label:
-
-- `operation-cancellation`: the canceled target is an observable operation, job,
-  task, run, execution, workflow, build, deployment, pipeline, export, import,
-  backup, restore, sync, scan, render, transcode, training, migration, index,
-  provision, snapshot, report, query, status monitor, or equivalent operation
-  handle.
-- `domain-state-transition`: the canceled target is a business object such as a
-  subscription, order, booking, plan, invoice, reservation, request, account, or
-  membership. Decide this from operation summaries, response schemas, lifecycle
-  fields, repository documentation, and creation responses, not from automated
-  linkage fields.
-- `ambiguous`: the route suggests cancellation, but the available route,
-  operation name, response codes, and adjacent paths do not prove whether the
-  target is an operation or a business object.
-
-Use secondary flags when applicable:
-
-- `extractor_false_positive`: the route was not a server-side HTTP API route or
-  was classified from unrelated text.
-- `generated_duplicate`: the record appears to be generated from a copied
-  catalog or repeated spec source.
-- `mixed_family_pattern`: the sampled family-pattern contains both
-  operation-looking and domain-looking cancellation routes.
-- `needs_adjacent_context`: the label depends on nearby routes not included in
-  the sampled representative row.
-
-Blind-labeling rule:
-
-- Hide `routeStratum`, `linkageBucket`, `familyPatternHas*`,
-  `strictFamilyHas*`, `routeLevelOperationLinked`, `operationTarget`,
-  `domainTransitionRisk`, and precomputed adjacent-linkage evidence from human
-  labelers during the first pass.
-- Allow each labeler the same bounded context budget: the sampled route,
-  operation summary/name, response codes and schema, nearby lifecycle/status
-  routes found by manual inspection, repository README/API docs when present,
-  and whether creation of the target resource returns `202` or an operation
-  handle.
-- Unhide automated linkage fields only after independent labels are recorded,
-  then use them for estimator weights, disagreement analysis, and extractor
-  improvement.
-
-## Label Sheet Columns
-
-The route-record sheet adds these route-frame fields:
-
-- `routeStratum`
-- `routeFramePopulationRecords`
-- `routeStratumSampleSize`
-- `routeStratumSamplingFraction`
-- `routeStratumAnalysisWeight`
-
-The support pattern-family sheet uses these pattern-frame fields:
-
-- `sample_id`
-- `samplingUnit`
-- `estimationPopulation`
-- `family_id`
-- `repository`
-- `pattern`
-- `linkageBucket`
-- `populationFamilyMemberships`
-- `patternSampleSize`
-- `patternSamplingFraction`
-- `analysisWeight`
-- `familyPatternHasSameResourceLinked`
-- `familyPatternHasOperationTarget`
-- `familyPatternHasDomainTransitionRisk`
-- `familyPatternCancellationEvidence`
-- `strictFamilyPatternMemberships`
-- `strictFamilyApproxInclusionProbability`
-- `strictFamilyApproxAnalysisWeight`
-
-All sheets share these route/context and label columns:
-
-- `family_id`
-- `repository`
-- `pattern`
-- `httpMethod`
-- `normalizedPath`
-- `path`
-- `sourceKind`
-- `file`
-- `lineStart`
-- `commit`
-- `symbol`
-- `responseCodes`
-- `confidence`
-- `cancelTargetPath`
-- `routeLevelOperationLinked`
-- `operationTarget`
-- `domainTransitionRisk`
-- `primaryLabel`
-- `secondaryFlags`
-- `reviewerConfidence`
-- `rationale`
-- `adjacentOperationEvidence`
-- `terminalStateEvidence`
-- `responseSemanticsEvidence`
-- `reviewer`
-- `adjudicatedLabel`
-
-The strict-family sheet uses the same route/context label columns, but replaces
-pattern-frame fields with:
-
-- `populationStrictFamilies`
-- `strictFamilySampleSize`
-- `strictFamilySamplingFraction`
-- `strictFamilyAnalysisWeight`
-- `strictFamilyPatternMemberships`
-- `strictFamilyHasSameResourceLinked`
-- `strictFamilyHasOperationTarget`
-- `strictFamilyHasDomainTransitionRisk`
-- `strictFamilyCancellationEvidence`
-
-For the route-record sheet, the primary label applies only to the sampled route
-record. Use route-frame weights for route-record precision and do not infer that
-all routes in the same family have the same semantics.
-
-For the pattern-family sheet, the primary label applies to the representative
-row. It is not a claim that every cancellation route in the same family-pattern
-membership has the same semantics. For mixed buckets, inspect
-`familyPatternCancellationEvidence` only after the first blind pass and use the
-`mixed_family_pattern` secondary flag when both operation and domain
-cancellation are present. If within-family mixing prevalence matters, run a
-follow-up all-routes audit on mixed buckets; the representative-row sheet is not
-designed to estimate that prevalence.
-
-For the strict-family sheet, the primary label applies to the family: label
-`operation-cancellation` if any strict cancellation evidence in the family is a
-true operation-cancellation affordance. Inspect `strictFamilyCancellationEvidence`
-only after the first blind pass.
-
-Recommended `reviewerConfidence` values:
-
-- `high`: route and independent context clearly identify the target semantics;
-- `medium`: route semantics are likely but missing one supporting signal;
-- `low`: label relies on naming only.
-
-## Review Process
-
-1. Generate the route-record, pattern-family, and strict-family sheets from the
-   same normalized evidence and family data.
-2. Give two reviewers a blinded copy of the selected sheet. Hide automated
-   linkage fields and each other's labels.
-3. Require both reviewers to use the same bounded context budget and to record
-   the independent evidence they used in `rationale`.
-4. Measure raw agreement and Cohen's kappa before discussion.
-5. Adjudicate disagreements into `adjudicatedLabel` with a third pass or named
-   adjudicator.
-6. Record common false-positive causes and update extractor or linkage rules
-   only after adjudication.
-7. Recompute corrected prevalence from adjudicated labels using the estimators
-   below.
-
-Agreement metrics:
-
-- report raw agreement by label;
-- report Cohen's kappa if both reviewers complete the same sample;
-- list all representative rows where one reviewer chose
-  `operation-cancellation` and the other chose `domain-state-transition`.
-
-## TP Rate and Confidence Intervals
-
-For each route or pattern stratum, compute these three ambiguity-safe rates:
-
-- `n`: adjudicated sample size;
-- `N`: population units for the stratum (`routeFramePopulationRecords` for the
-  route sheet, `populationFamilyMemberships` for the support pattern sheet);
-- `tp`: rows labeled `operation-cancellation`;
-- `ambiguous`: rows labeled `ambiguous`;
-- `ambiguous_as_fp_rate`: `tp / n`;
-- `ambiguous_excluded_rate`: `tp / (n - ambiguous)` when
-  `n - ambiguous > 0`;
-- `ambiguous_as_tp_rate`: `(tp + ambiguous) / n`.
-
-Report Wilson or Clopper-Pearson 95% confidence intervals for sampled strata. Do
-not use Wald intervals for small strata such as `n=5`, `n=18`, or `n=27`. When a
-stratum is a full census (`n == N`), mark it as census and do not present a
-sampling-error interval as if it were sampled. For near-census strata such as
-`delete-action-cancel` (`30/31`), apply a finite-population correction when
-estimating sampling variance.
-
-Wilson interval:
-
-```text
-center = (p + z²/(2n)) / (1 + z²/n)
-margin = z * sqrt((p(1-p) + z²/(4n)) / n) / (1 + z²/n)
-z = 1.96
-```
-
-For the primary route-record estimate, use the route sheet:
-
-```text
-route_weighted_rate = sum(N_route_stratum * rate_route_stratum) / sum(N_route_stratum)
-```
-
-The route strata are exclusive in this sheet. Compute the route-weighted
-estimate separately for `ambiguous_as_fp_rate`, `ambiguous_excluded_rate`, and
-`ambiguous_as_tp_rate`. Its denominator is 1,658 deduplicated cancellation route
-records, not 407 unique strict families and not 517 strict pattern-family
-memberships.
-
-For the support strict cancellation estimate, use a stratified pattern-family
-weighted estimate over the strict patterns only:
-
-```text
-pattern_weighted_rate = sum(N_pattern * rate_pattern) / sum(N_pattern)
-```
-
-Compute the weighted estimate separately for `ambiguous_as_fp_rate`,
-`ambiguous_excluded_rate`, and `ambiguous_as_tp_rate`. This denominator is the
-517 strict pattern-family memberships, not the 407 unique strict cancellation
-families. Its sampling variance should use stratum weights and finite-population
-correction; in practice the non-census contribution is dominated by
-`post-subresource-cancel` and `post-action-cancel`.
-
-Use the strict-family sheet for the 407-family estimate:
-
-```text
-family_rate = labeled_operation_cancellation_families / sampled_strict_families
-```
-
-The current full sheet is a simple random sample of 140 out of 407 strict
-families. Apply finite-population correction to its interval and report labeling
-disagreement separately.
-
-Report separate estimates for:
-
-- route-record cancellation precision;
-- strict cancellation only;
-- strict same-resource linked cancellation;
-- strict operation-like target cancellation;
-- `delete-operation-resource` audit evidence.
-
-Do not combine `delete-operation-resource` into the strict denominator unless
-the adjudicated sample justifies changing the strict definition.
-
-## Acceptance Thresholds For Drafting
-
-Proceed to an Internet-Draft skeleton if:
-
-- route-record TP rates and the route-weighted operation-cancellation estimate
-  are published with ambiguity bounds, confidence intervals, finite-population
-  correction where applicable, and denominator caveats;
-- `post-subresource-cancel` linked and unlinked route strata are reported
-  separately so business-cancellation precision risk is visible;
-- per-pattern TP rates and the support strict pattern-family estimate are
-  published as secondary evidence, not as a family prevalence denominator;
-- the strict-family sample is labeled before updating unique-family denominator
-  claims over 407 / 194 / 222 families;
-- domain-state-transition examples are explicitly acknowledged in the
-  motivation;
-- `delete-operation-resource` is either kept as supporting evidence or promoted
-  through a documented rule change.
-
-If these conditions fail, keep `http-cancellation` as a section of the broader
-operation-resource study rather than a standalone draft.

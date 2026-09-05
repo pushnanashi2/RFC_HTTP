@@ -1,7 +1,7 @@
 {
   "byPattern": {
     "delete-action-cancel": 39,
-    "delete-operation-resource": 213,
+    "delete-operation-resource": 204,
     "get-cancel-link": 33,
     "patch-state-cancelled": 8,
     "post-action-cancel": 65,
@@ -9,26 +9,27 @@
     "put-action-cancel": 47
   },
   "bySourceKind": {
-    "openapi": 185,
-    "source": 435
+    "openapi": 178,
+    "source": 433
   },
   "cellRouteCounts": {
     "distribution": {
-      "1": 150,
+      "1": 159,
       "10": 2,
+      "11": 1,
       "12": 1,
-      "2": 76,
-      "3": 28,
+      "2": 67,
+      "3": 31,
       "4": 17,
-      "5": 8,
-      "6": 9,
-      "7": 1,
+      "5": 5,
+      "6": 7,
+      "7": 2,
       "8": 3,
       "9": 1
     },
-    "extraRouteLabelsOverRepresentatives": 324,
+    "extraRouteLabelsOverRepresentatives": 315,
     "selectedCells": 296,
-    "selectedRouteRecords": 620
+    "selectedRouteRecords": 611
   },
   "estimationGuidance": {
     "blinding": "Create a separate reviewer view that hides automated linkage columns before labeling.",
@@ -36,7 +37,7 @@
     "purpose": "Use this companion sheet when manual labeling needs to observe within-cell operation/domain mixing. Aggregate route labels back to cell_sample_id before estimating pattern-family membership precision."
   },
   "estimationPopulation": "sampled-family-pattern-cell-routes",
-  "sampleCount": 620,
+  "sampleCount": 611,
   "sampledCells": 296,
   "samplingUnit": "family-pattern-cell-route",
   "selectionProvenance": {
@@ -45,7 +46,7 @@
     "frameSnapshotHash": "36035d4b0fc6d94b0342fe196b20d4ff4ac26c6fb44d607e9909d4acf4f07da5",
     "pythonVersion": "3.10.12",
     "routeId": "sha256(repository, httpMethod, normalizedPath-or-path)",
-    "samplingCodeCommit": "1e5a293639ca061e68285c87dbc83797e1256bc6",
+    "samplingCodeCommit": "dfff3b1d0174fc09924e48147f10a41b53496245",
     "seed": 20260904
   }
 }

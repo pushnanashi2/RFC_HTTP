@@ -9,8 +9,8 @@
     "put-action-cancel": 47
   },
   "byRouteLevelLinkage": {
-    "linked": 174,
-    "unlinked": 203
+    "linked": 175,
+    "unlinked": 202
   },
   "byRouteStratum": {
     "delete-action-cancel:any": 39,
@@ -31,7 +31,7 @@
   "estimationPopulation": "route-cancellation-record",
   "populationRouteRecordsByStratum": {
     "delete-action-cancel:any": 39,
-    "delete-operation-resource:any": 468,
+    "delete-operation-resource:any": 465,
     "get-cancel-link:any": 33,
     "patch-state-cancelled:any": 8,
     "post-action-cancel:any": 189,
@@ -48,7 +48,7 @@
     "routeId": "sha256(repository, httpMethod, normalizedPath-or-path)",
     "routeRecordSeedNamespace": "{seed}:route-record:{stratum}",
     "routeRecordSelection": "Uniform pseudo-random route selection within each exclusive route stratum.",
-    "samplingCodeCommit": "1e5a293639ca061e68285c87dbc83797e1256bc6",
+    "samplingCodeCommit": "dfff3b1d0174fc09924e48147f10a41b53496245",
     "seed": 20260904
   }
 }
