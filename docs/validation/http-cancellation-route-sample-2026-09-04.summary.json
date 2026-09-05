@@ -29,6 +29,14 @@
     "purpose": "Use this sheet for route-record operation-vs-domain cancellation precision. Do not use it to update unique-family denominator claims."
   },
   "estimationPopulation": "route-cancellation-record",
+  "labelingProvenance": {
+    "labelerAModel": "",
+    "labelerAPromptHash": "cd0c951c7128ad4ca00f7ce7ebff23ef5bf8adfc03ed5e5f1aa5b32a2e1324a3",
+    "labelerBModel": "",
+    "labelerBPromptHash": "e2b683db3b0972ee1dab238f9945c907d8dc9f1104002e16f6cb2598aec9066d",
+    "labelingRunDate": "",
+    "labelingTemperature": 0
+  },
   "populationRouteRecordsByStratum": {
     "delete-action-cancel:any": 39,
     "delete-operation-resource:any": 465,
@@ -48,7 +56,7 @@
     "routeId": "sha256(repository, httpMethod, normalizedPath-or-path)",
     "routeRecordSeedNamespace": "{seed}:route-record:{stratum}",
     "routeRecordSelection": "Uniform pseudo-random route selection within each exclusive route stratum.",
-    "samplingCodeCommit": "dc24a32c27603539079015a9aded627bc9342f36",
+    "samplingCodeCommit": "b95fe0defe18081cb30dca5e278b659e9ae5207e",
     "seed": 20260904
   }
 }

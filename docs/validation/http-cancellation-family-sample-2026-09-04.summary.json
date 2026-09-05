@@ -19,6 +19,14 @@
     "purpose": "Use this sheet, not the pattern-family sheet, when updating unique-family claims over the 407 strict cancellation families."
   },
   "estimationPopulation": "strict-cancellation-family",
+  "labelingProvenance": {
+    "labelerAModel": "",
+    "labelerAPromptHash": "cd0c951c7128ad4ca00f7ce7ebff23ef5bf8adfc03ed5e5f1aa5b32a2e1324a3",
+    "labelerBModel": "",
+    "labelerBPromptHash": "e2b683db3b0972ee1dab238f9945c907d8dc9f1104002e16f6cb2598aec9066d",
+    "labelingRunDate": "",
+    "labelingTemperature": 0
+  },
   "populationStrictFamilies": 407,
   "sampleCount": 140,
   "samplingFraction": "0.343980",
@@ -30,7 +38,7 @@
     "frameSnapshotHash": "36035d4b0fc6d94b0342fe196b20d4ff4ac26c6fb44d607e9909d4acf4f07da5",
     "pythonVersion": "3.10.12",
     "routeId": "sha256(repository, httpMethod, normalizedPath-or-path)",
-    "samplingCodeCommit": "dc24a32c27603539079015a9aded627bc9342f36",
+    "samplingCodeCommit": "b95fe0defe18081cb30dca5e278b659e9ae5207e",
     "seed": 20260904
   }
 }

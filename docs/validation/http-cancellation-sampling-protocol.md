@@ -56,6 +56,7 @@ Generated validation artifacts:
 | `docs/validation/http-cancellation-sample-2026-09-04.csv` | 320 cells | Cell-level sample and machine metadata |
 | `docs/validation/http-cancellation-cell-route-sample-2026-09-04.csv` | 635 route rows | All route records inside selected cells |
 | `docs/validation/http-cancellation-cell-route-labeling-view-2026-09-04.csv` | 635 route rows | Blinded reviewer worksheet |
+| `docs/validation/http-cancellation-cell-route-labeling-view-2026-09-04.summary.json` | 1 sidecar | Labeling workflow and prompt provenance |
 | `docs/validation/http-cancellation-cell-route-machine-columns-2026-09-04.csv` | 635 route rows | Hidden machine columns keyed by `evidence_id` |
 | `docs/validation/http-cancellation-family-sample-2026-09-04.csv` | 140 families | Descriptive strict-family sensitivity sample |
 | `docs/validation/http-cancellation-route-sample-2026-09-04.csv` | 377 routes | Descriptive route-frame sensitivity sample |
@@ -172,9 +173,18 @@ Sampling provenance is stored in each `.summary.json` sidecar rather than in
 every CSV row. The current cell sample summary records:
 
 - `seed`: `20260904`
-- `samplingCodeCommit`: `dc24a32c27603539079015a9aded627bc9342f36`
+- `samplingCodeCommit`: `b95fe0defe18081cb30dca5e278b659e9ae5207e`
 - `pythonVersion`: `3.10.12`
 - `frameSnapshotHash`: `36035d4b0fc6d94b0342fe196b20d4ff4ac26c6fb44d607e9909d4acf4f07da5`
+
+Labeling provenance is also stored in the generated `.summary.json` sidecars:
+
+- `labelerAModel`: empty until labeling is run
+- `labelerAPromptHash`: `cd0c951c7128ad4ca00f7ce7ebff23ef5bf8adfc03ed5e5f1aa5b32a2e1324a3`
+- `labelerBModel`: empty until labeling is run
+- `labelerBPromptHash`: `e2b683db3b0972ee1dab238f9945c907d8dc9f1104002e16f6cb2598aec9066d`
+- `labelingRunDate`: empty until labeling is run
+- `labelingTemperature`: `0`
 
 ## 5. Selection Rules
 
@@ -242,12 +252,19 @@ Machine-generated columns are physically separated into
 `docs/validation/http-cancellation-cell-route-machine-columns-2026-09-04.csv`.
 Join the two files only after final labels are recorded.
 
-Hidden from labelers during the first pass:
+### Labelers
 
-- `pattern`
-- `routeStratum`
+The labeling pass uses two independent LLM labelers:
+
+- Labeler A uses the verbatim prompt committed at `prompts/label-a.md`.
+- Labeler B uses the verbatim prompt committed at `prompts/label-b.md`.
+- Prompt A and prompt B are independently written instructions, not paraphrases
+  of one another.
+- Both labelers receive only the blinded labeling view.
+
+The required withheld machine columns are:
+
 - `linkageBucket`
-- `deleteOperationResourceBucket`
 - `familyPatternHasSameResourceLinked`
 - `familyPatternHasOperationTarget`
 - `familyPatternHasDomainTransitionRisk`
@@ -256,7 +273,10 @@ Hidden from labelers during the first pass:
 - `domainTransitionRisk`
 - `confidence`
 - `cancelTargetPath`
-- precomputed adjacent-linkage evidence
+
+The generated blinded view also omits `pattern`, `routeStratum`,
+`deleteOperationResourceBucket`, precomputed adjacent-linkage evidence, and the
+legacy reviewer fields from earlier manual-label workflows.
 
 Visible reviewer context:
 
@@ -271,52 +291,63 @@ Visible reviewer context:
 - `symbol`
 - `responseCodes`
 - bounded response semantics evidence
+- `label_taxonomy`
+- `allowed_final_labels`
 
-Workflow:
+The unanchored subset was removed. It existed to measure anchoring under the old
+LLM-draft-then-human-adjudication workflow. The new workflow has two LLM
+labelers that are both primary labelers, so the 80-cell unanchored carve-out no
+longer has a role.
 
-1. Produce an LLM draft label for each route row using only the blinded evidence
-   packet for that row.
-2. Require a verbatim quote from the evidence packet and a one-sentence rationale.
-3. Verify mechanically that each quoted string exists in the packet.
-4. Human-adjudicate every labeled route row.
-5. Aggregate route labels back to `cell_sample_id` before computing cell-stratum
-   estimates.
+### Independence Limitations
 
-The worksheet contains an `unanchored_subset` marker for 80 sampled cells. Those
-cells are selected by deterministic stratum-aware allocation over the generated
-cell sheet: each non-empty selected stratum gets at least one cell when capacity
-allows, and the remaining cells are allocated proportionally. For those cells,
-human reviewers must not see the LLM draft before recording independent labels.
-Use that subset to estimate anchoring effects and human-human agreement.
+The two LLM labelers are operationally separated, but they are not statistically
+independent human raters. They may share model families, training corpora, RLHF
+preferences, vendor behavior, and common benchmark exposure. Reported agreement
+is therefore inter-model agreement, not a substitute for human inter-rater
+reliability. Use it as a diagnostic for label stability under prompt and model
+variation.
 
-## 8. Adjudication and Agreement
+### Adjudication
 
-All route rows require a final adjudicated label before estimator scripts run.
-Only `final_label` counts for estimation.
+Each route row receives one label from A and one label from B. If A and B agree,
+that shared value becomes `final_label` without human review. If A and B
+disagree, one human author adjudicates the row. The adjudicator may see both
+labels and both rationales, but must not see the withheld machine columns.
+
+After adjudication, aggregate route labels back to `cell_sample_id` before
+computing cell-stratum estimates.
+
+## 8. Label Outputs and Agreement
+
+Only `final_label` counts for estimation. The `agreement` and `adjudicated`
+columns are stored outputs: `agreement` records whether A and B matched, and
+`adjudicated` records whether human adjudication was required.
 
 Recommended worksheet fields:
 
-- `draft_label`
-- `draft_quote`
-- `draft_rationale`
-- `labeler_a_label`
-- `labeler_a_quote`
-- `labeler_a_rationale`
-- `labeler_b_label`
-- `labeler_b_quote`
-- `labeler_b_rationale`
+- `labelerA_label`
+- `labelerA_rationale`
+- `labelerA_confidence`
+- `labelerB_label`
+- `labelerB_rationale`
+- `labelerB_confidence`
+- `agreement`
 - `final_label`
-- `adjudicator`
-- `changed_from_draft`
-- `note`
+- `adjudicated`
+- `adjudicator_rationale`
 
-Report agreement separately from sampling uncertainty:
+Report labeling variation separately from sampling uncertainty:
 
-- LLM draft vs final human label over all rows;
-- human-human raw agreement and Cohen's kappa on the 80-cell unanchored subset;
-- disagreement counts by stratum and taxonomy.
+- overall inter-model agreement;
+- inter-model agreement by taxonomy and stratum;
+- disagreement rate by taxonomy and stratum;
+- number and share of rows requiring author adjudication;
+- adjudication counts by taxonomy and stratum.
 
-Kappa is a reliability diagnostic, not a pass/fail threshold.
+These values are reported alongside ICC and DEFF, but they measure different
+risks: ICC and DEFF describe cluster sampling behavior, while disagreement and
+adjudication counts describe labeling stability.
 
 ## 9. Estimators and Intervals
 
@@ -355,6 +386,10 @@ Intervals:
 - keep census strata fixed because their cell-selection variance is zero;
 - use 5,000 bootstrap replicates by default;
 - report percentile 95% intervals for each ambiguity variant.
+
+The bootstrap interval is sampling error for the cell extraction design only. It
+does not include label error, inter-labeler variation, prompt sensitivity, model
+choice, or author adjudication bias. Do not present it as a total error interval.
 
 The census strata are:
 
@@ -413,12 +448,16 @@ protocol is revised and the estimand is changed.
   boundary stratum, but they are not part of the same-resource linked envelope.
 - The 30.7% to 44.7% linkage range is a structural bounding interval. Sampling
   confidence intervals are computed separately after labels are available.
+- Inter-model agreement is not human inter-rater reliability because both LLM
+  labelers can share pretraining, vendor, and alignment biases.
+- Author adjudication is a single-human decision point and must be reported as a
+  possible bias source, not hidden inside the sampling interval.
 - Same-pattern `source` and `openapi` rows can share a `route_id`; use
   `evidence_id` for worksheet joins.
 - Cross-pattern route duplication was rare in the raw frame and is removed by
   deterministic primary-pattern assignment before sampling.
-- Labeling uncertainty is separate from sampling uncertainty; report agreement
-  and anchoring diagnostics alongside confidence intervals.
+- Labeling uncertainty is separate from sampling uncertainty; report inter-model
+  disagreement and adjudication counts alongside confidence intervals.
 
 ## 12. Reproduction Commands
 
@@ -447,6 +486,5 @@ rfc-miner split-cancellation-labeling-view \
   --data-dir /mnt/cash-data/rfc-http-miner/data-5000-refined \
   --input docs/validation/http-cancellation-cell-route-sample-2026-09-04.csv \
   --labeling-output docs/validation/http-cancellation-cell-route-labeling-view-2026-09-04.csv \
-  --machine-output docs/validation/http-cancellation-cell-route-machine-columns-2026-09-04.csv \
-  --unanchored-size 80
+  --machine-output docs/validation/http-cancellation-cell-route-machine-columns-2026-09-04.csv
 ```
