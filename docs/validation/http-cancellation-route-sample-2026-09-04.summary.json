@@ -56,7 +56,7 @@
     "routeId": "sha256(repository, httpMethod, normalizedPath-or-path)",
     "routeRecordSeedNamespace": "{seed}:route-record:{stratum}",
     "routeRecordSelection": "Uniform pseudo-random route selection within each exclusive route stratum.",
-    "samplingCodeCommit": "b95fe0defe18081cb30dca5e278b659e9ae5207e",
+    "samplingCodeCommit": "47f22ff966d0cd667fdddffdbf3050fece1a762e",
     "seed": 20260904
   }
 }

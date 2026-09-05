@@ -173,7 +173,7 @@ Sampling provenance is stored in each `.summary.json` sidecar rather than in
 every CSV row. The current cell sample summary records:
 
 - `seed`: `20260904`
-- `samplingCodeCommit`: `b95fe0defe18081cb30dca5e278b659e9ae5207e`
+- `samplingCodeCommit`: `47f22ff966d0cd667fdddffdbf3050fece1a762e`
 - `pythonVersion`: `3.10.12`
 - `frameSnapshotHash`: `36035d4b0fc6d94b0342fe196b20d4ff4ac26c6fb44d607e9909d4acf4f07da5`
 
@@ -262,6 +262,14 @@ The labeling pass uses two independent LLM labelers:
   of one another.
 - Both labelers receive only the blinded labeling view.
 
+Prompt A and Prompt B intentionally share taxonomy labels, but their boundary
+language differs. Prompt A frames ambiguity as a failure to prove one class;
+Prompt B frames it as visible evidence not settling the meaning. For the DELETE
+audit, Prompt A contrasts cancellation with removal, archival, garbage
+collection, or forgetting; Prompt B contrasts stopping in-progress work with
+deleting, archiving, cleaning up, forgetting, or garbage-collecting the
+operation record.
+
 The required withheld machine columns are:
 
 - `linkageBucket`
@@ -324,6 +332,13 @@ Only `final_label` counts for estimation. The `agreement` and `adjudicated`
 columns are stored outputs: `agreement` records whether A and B matched, and
 `adjudicated` records whether human adjudication was required.
 
+Agreement is exact label equality inside the row's active taxonomy. For
+operation-vs-domain rows, A and B must both choose the same one of
+`operation-cancellation`, `domain-state-transition`, or `ambiguous`. For DELETE
+audit rows, A and B must both choose the same one of `cancellation`,
+`deletion-or-archival`, or `ambiguous`; broader operation/domain agreement is
+not sufficient.
+
 Recommended worksheet fields:
 
 - `labelerA_label`
@@ -349,7 +364,35 @@ These values are reported alongside ICC and DEFF, but they measure different
 risks: ICC and DEFF describe cluster sampling behavior, while disagreement and
 adjudication counts describe labeling stability.
 
-## 9. Estimators and Intervals
+## 9. Pilot Labeling
+
+Run a pilot before full labeling. The pilot is a prompt-validation exercise, not
+part of the inferential sample. Do not mix pilot labels into the final estimator
+if prompts or labeler settings change afterward.
+
+Pilot selection:
+
+- select 30 to 50 route rows;
+- take roughly half from `delete-operation-resource` rows and half from
+  `post-subresource-cancel` rows;
+- avoid census-only strata for the pilot because they are less likely to expose
+  hard boundary cases;
+- record every pilot `evidence_id` in the pilot log before labeling begins.
+
+Pilot decision rules:
+
+- if the disagreement rate is above 40%, tighten the prompts or criteria before
+  full labeling;
+- if the disagreement rate is below 5%, widen the prompt differences or use more
+  distinct model configurations before full labeling;
+- if the `ambiguous` rate is above 50%, revise the label criteria before full
+  labeling.
+
+The pilot log location is
+`docs/validation/http-cancellation-pilot-2026-09-05.md`. If a later pilot date
+is used, create a new dated log rather than overwriting this protocol.
+
+## 10. Estimators and Intervals
 
 Because the design is a stratified cluster sample, do not use pooled
 Clopper-Pearson, Wilson, or Wald intervals over route rows.
@@ -421,7 +464,7 @@ ICC and DEFF are findings, not mere diagnostics. If ICC is high, cell-level
 semantics dominate and the cluster design is justified. If ICC is low,
 family-pattern cells hide meaningful route-level heterogeneity.
 
-## 10. Role of Other Samples
+## 11. Role of Other Samples
 
 The 140-row strict-family sample and 377-row route-record sample are descriptive
 sensitivity artifacts.
@@ -436,7 +479,7 @@ Use them for:
 Do not use them to replace the primary 320-cell cluster design unless the
 protocol is revised and the estimand is changed.
 
-## 11. Known Limitations
+## 12. Known Limitations
 
 - The protocol estimates evidence precision for the current detection frame, not
   prevalence among all HTTP APIs.
@@ -459,7 +502,7 @@ protocol is revised and the estimand is changed.
 - Labeling uncertainty is separate from sampling uncertainty; report inter-model
   disagreement and adjudication counts alongside confidence intervals.
 
-## 12. Reproduction Commands
+## 13. Reproduction Commands
 
 Generate the primary cell sheet:
 
