@@ -8,6 +8,7 @@ import subprocess
 import sys
 import tempfile
 import unittest
+from collections import Counter
 from pathlib import Path
 from unittest.mock import patch
 
@@ -32,6 +33,10 @@ from rfc_miner.normalization import normalize_evidence, normalize_path, normaliz
 from rfc_miner.paths import data_paths
 from rfc_miner.reporting import write_report
 from rfc_miner.sampling import (
+    stable_evidence_id,
+    stable_route_id,
+    write_blind_labeling_views,
+    write_cancellation_cell_route_sample,
     write_cancellation_family_sample,
     write_cancellation_route_sample,
     write_cancellation_sample,
@@ -576,6 +581,9 @@ class PipelineTests(unittest.TestCase):
             self.assertEqual({row["samplingUnit"] for row in rows}, {"family-pattern-representative"})
             self.assertEqual({row["estimationPopulation"] for row in rows}, {"strict-cancellation"})
             self.assertEqual({row["populationFamilyMemberships"] for row in rows}, {"2"})
+            self.assertTrue(all(row["route_id"] for row in rows))
+            self.assertTrue(all(row["evidence_id"] for row in rows))
+            self.assertTrue(all(row["cellRouteCount"] for row in rows))
             self.assertTrue(all(row["familyPatternCancellationEvidence"] for row in rows))
             self.assertTrue(all(row["strictFamilyApproxInclusionProbability"] for row in rows))
             self.assertEqual(
@@ -603,6 +611,177 @@ class PipelineTests(unittest.TestCase):
             route_summary = json.loads(route_output.with_suffix(".summary.json").read_text(encoding="utf-8"))
             self.assertEqual(route_summary["samplingUnit"], "route-record")
             self.assertIn("blindLabeling", route_summary["estimationGuidance"])
+
+            cell_route_output, cell_route_count = write_cancellation_cell_route_sample(
+                paths=paths,
+                profile="minimum",
+                seed=1,
+            )
+            with cell_route_output.open("r", encoding="utf-8", newline="") as handle:
+                cell_route_rows = list(csv.DictReader(handle))
+
+            self.assertEqual(cell_route_count, 3)
+            self.assertEqual({row["samplingUnit"] for row in cell_route_rows}, {"family-pattern-cell-route"})
+            self.assertEqual(
+                {row["normalizedPath"] for row in cell_route_rows},
+                {"/jobs/{var}/cancel", "/subscriptions/{var}/cancel"},
+            )
+            self.assertEqual(len({row["cell_sample_id"] for row in cell_route_rows}), 2)
+            cell_route_summary = json.loads(
+                cell_route_output.with_suffix(".summary.json").read_text(encoding="utf-8")
+            )
+            self.assertTrue(cell_route_summary["estimationGuidance"]["doNotUseAsRouteFrame"])
+
+            labeling_output, machine_output, split_count = write_blind_labeling_views(
+                input_path=cell_route_output,
+                labeling_output_path=Path(temporary) / "labeling.csv",
+                machine_output_path=Path(temporary) / "machine.csv",
+                seed=1,
+                unanchored_size=1,
+            )
+            with labeling_output.open("r", encoding="utf-8", newline="") as handle:
+                labeling_rows = list(csv.DictReader(handle))
+            with labeling_output.open("r", encoding="utf-8", newline="") as handle:
+                labeling_reader = csv.DictReader(handle)
+                list(labeling_reader)
+                labeling_fields = set(labeling_reader.fieldnames or [])
+            with machine_output.open("r", encoding="utf-8", newline="") as handle:
+                machine_reader = csv.DictReader(handle)
+                machine_rows = list(machine_reader)
+                machine_fields = set(machine_reader.fieldnames or [])
+
+            self.assertEqual(split_count, cell_route_count)
+            self.assertEqual(len(labeling_rows), cell_route_count)
+            self.assertEqual(len(machine_rows), cell_route_count)
+            self.assertNotIn("routeLevelOperationLinked", labeling_fields)
+            self.assertNotIn("operationTarget", labeling_fields)
+            self.assertNotIn("domainTransitionRisk", labeling_fields)
+            self.assertNotIn("confidence", labeling_fields)
+            self.assertIn("routeLevelOperationLinked", machine_fields)
+            self.assertIn("evidence_id", labeling_fields)
+            self.assertIn("evidence_id", machine_fields)
+            self.assertEqual(Counter(row["unanchored_subset"] for row in labeling_rows)["true"], 1)
+
+    def test_cancellation_representative_route_is_seeded_not_outcome_sorted(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            paths = data_paths(temporary)
+            write_jsonl(
+                paths.repositories,
+                [{"repo_id": "example/ops", "repository_url": "https://github.com/example/ops"}],
+            )
+            write_jsonl(
+                paths.raw_evidence,
+                [
+                    {
+                        "repository": "example/ops",
+                        "commit": "abc123",
+                        "concept": "http-async-operation",
+                        "evidenceType": "route",
+                        "httpMethod": "GET",
+                        "path": "/jobs/{id}/status",
+                        "responseCodes": [200],
+                        "file": "openapi.yaml",
+                        "lineStart": 1,
+                        "lineEnd": 1,
+                        "confidence": 0.9,
+                        "extractedValue": {},
+                        "extractor": "openapi",
+                    },
+                    {
+                        "repository": "example/ops",
+                        "commit": "abc123",
+                        "concept": "http-cancellation",
+                        "evidenceType": "route",
+                        "httpMethod": "POST",
+                        "path": "/jobs/{id}/cancel",
+                        "responseCodes": [202],
+                        "file": "openapi.yaml",
+                        "lineStart": 2,
+                        "lineEnd": 2,
+                        "confidence": 0.96,
+                        "extractedValue": {},
+                        "extractor": "openapi",
+                    },
+                    {
+                        "repository": "example/ops",
+                        "commit": "abc123",
+                        "concept": "http-cancellation",
+                        "evidenceType": "route",
+                        "httpMethod": "POST",
+                        "path": "/subscriptions/{id}/cancel",
+                        "responseCodes": [200],
+                        "file": "openapi.yaml",
+                        "lineStart": 3,
+                        "lineEnd": 3,
+                        "confidence": 0.78,
+                        "extractedValue": {},
+                        "extractor": "openapi",
+                    },
+                ],
+            )
+            normalize_evidence(paths=paths)
+            dedupe_repositories(paths=paths)
+
+            first_output, first_count = write_cancellation_sample(
+                paths=paths,
+                output_path=Path(temporary) / "first.csv",
+                profile="minimum",
+                seed=1,
+            )
+            second_output, second_count = write_cancellation_sample(
+                paths=paths,
+                output_path=Path(temporary) / "second.csv",
+                profile="minimum",
+                seed=2,
+            )
+            repeat_output, repeat_count = write_cancellation_sample(
+                paths=paths,
+                output_path=Path(temporary) / "repeat.csv",
+                profile="minimum",
+                seed=1,
+            )
+            with first_output.open("r", encoding="utf-8", newline="") as handle:
+                first_rows = list(csv.DictReader(handle))
+            with second_output.open("r", encoding="utf-8", newline="") as handle:
+                second_rows = list(csv.DictReader(handle))
+
+            self.assertEqual(first_count, 1)
+            self.assertEqual(second_count, 1)
+            self.assertEqual(repeat_count, first_count)
+            self.assertEqual(repeat_output.read_text(encoding="utf-8"), first_output.read_text(encoding="utf-8"))
+            self.assertEqual(first_rows[0]["normalizedPath"], "/subscriptions/{var}/cancel")
+            self.assertEqual(first_rows[0]["routeLevelOperationLinked"], "false")
+            self.assertEqual(second_rows[0]["normalizedPath"], "/jobs/{var}/cancel")
+            self.assertEqual(second_rows[0]["routeLevelOperationLinked"], "true")
+            self.assertEqual(len(first_rows[0]["route_id"]), 64)
+            self.assertEqual(len(first_rows[0]["evidence_id"]), 64)
+
+    def test_cancellation_ids_separate_route_identity_from_evidence_identity(self) -> None:
+        base_record = {
+            "repository": "example/ops",
+            "commit": "abc123",
+            "pattern": "post-subresource-cancel",
+            "httpMethod": "POST",
+            "normalizedPath": "/jobs/{var}/cancel",
+            "path": "/jobs/{id}/cancel",
+            "sourceKind": "source",
+            "file": "routes.py",
+            "lineStart": 10,
+            "symbol": "cancel_job",
+        }
+        changed_commit = dict(base_record, commit="def456")
+        changed_source = dict(base_record, sourceKind="openapi", file="openapi.yaml")
+
+        self.assertEqual(stable_route_id(base_record), stable_route_id(changed_commit))
+        self.assertEqual(stable_route_id(base_record), stable_route_id(changed_source))
+        self.assertNotEqual(
+            stable_evidence_id(base_record, route_id=stable_route_id(base_record)),
+            stable_evidence_id(changed_commit, route_id=stable_route_id(changed_commit)),
+        )
+        self.assertNotEqual(
+            stable_evidence_id(base_record, route_id=stable_route_id(base_record)),
+            stable_evidence_id(changed_source, route_id=stable_route_id(changed_source)),
+        )
 
     def test_cancellation_family_sample_uses_unique_families(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:

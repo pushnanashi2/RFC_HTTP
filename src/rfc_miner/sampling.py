@@ -1,7 +1,11 @@
 from __future__ import annotations
 
 import csv
+import hashlib
+import os
 import random
+import subprocess
+import sys
 from collections import Counter, defaultdict
 from pathlib import Path
 from typing import Any
@@ -18,12 +22,12 @@ from .paths import DataPaths, ensure_data_dirs
 
 FULL_SAMPLE_SIZES = {
     "post-subresource-cancel": 80,
-    "post-action-cancel": 50,
-    "delete-action-cancel": 30,
+    "post-action-cancel": 35,
+    "delete-action-cancel": 31,
     "put-action-cancel": 27,
     "get-cancel-link": 18,
     "patch-state-cancelled": 5,
-    "delete-operation-resource": 50,
+    "delete-operation-resource": 100,
 }
 
 FULL_ROUTE_SAMPLE_SIZES: dict[str, int | None] = {
@@ -76,11 +80,14 @@ BUCKET_ORDER = (
 
 SAMPLE_COLUMNS = [
     "sample_id",
+    "route_id",
+    "evidence_id",
     "samplingUnit",
     "estimationPopulation",
     "family_id",
     "repository",
     "pattern",
+    "cellRouteCount",
     "linkageBucket",
     "populationFamilyMemberships",
     "patternSampleSize",
@@ -120,6 +127,8 @@ SAMPLE_COLUMNS = [
 
 FAMILY_SAMPLE_COLUMNS = [
     "sample_id",
+    "route_id",
+    "evidence_id",
     "samplingUnit",
     "estimationPopulation",
     "family_id",
@@ -162,6 +171,8 @@ FAMILY_SAMPLE_COLUMNS = [
 
 ROUTE_SAMPLE_COLUMNS = [
     "sample_id",
+    "route_id",
+    "evidence_id",
     "samplingUnit",
     "estimationPopulation",
     "routeStratum",
@@ -197,6 +208,140 @@ ROUTE_SAMPLE_COLUMNS = [
     "adjudicatedLabel",
 ]
 
+CELL_ROUTE_SAMPLE_COLUMNS = [
+    "sample_id",
+    "cell_sample_id",
+    "cellRouteOrdinal",
+    "route_id",
+    "evidence_id",
+    "samplingUnit",
+    "estimationPopulation",
+    "family_id",
+    "repository",
+    "pattern",
+    "cellRouteCount",
+    "linkageBucket",
+    "populationFamilyMemberships",
+    "patternSampleSize",
+    "patternSamplingFraction",
+    "analysisWeight",
+    "familyPatternHasSameResourceLinked",
+    "familyPatternHasOperationTarget",
+    "familyPatternHasDomainTransitionRisk",
+    "familyPatternCancellationEvidence",
+    "strictFamilyPatternMemberships",
+    "strictFamilyApproxInclusionProbability",
+    "strictFamilyApproxAnalysisWeight",
+    "httpMethod",
+    "normalizedPath",
+    "path",
+    "sourceKind",
+    "file",
+    "lineStart",
+    "commit",
+    "symbol",
+    "responseCodes",
+    "confidence",
+    "cancelTargetPath",
+    "routeLevelOperationLinked",
+    "operationTarget",
+    "domainTransitionRisk",
+    "primaryLabel",
+    "secondaryFlags",
+    "reviewerConfidence",
+    "rationale",
+    "adjacentOperationEvidence",
+    "terminalStateEvidence",
+    "responseSemanticsEvidence",
+    "reviewer",
+    "adjudicatedLabel",
+]
+
+LABELING_ID_COLUMNS = [
+    "sample_id",
+    "cell_sample_id",
+    "cellRouteOrdinal",
+    "route_id",
+    "evidence_id",
+]
+
+LABELING_CONTEXT_COLUMNS = [
+    "repository",
+    "commit",
+    "httpMethod",
+    "normalizedPath",
+    "path",
+    "sourceKind",
+    "file",
+    "lineStart",
+    "symbol",
+    "responseCodes",
+    "responseSemanticsEvidence",
+]
+
+LABELING_WORKFLOW_COLUMNS = [
+    "unanchored_subset",
+    "draft_visible_to_human",
+    "draft_label",
+    "draft_quote",
+    "draft_rationale",
+    "labeler_a_label",
+    "labeler_a_quote",
+    "labeler_a_rationale",
+    "labeler_b_label",
+    "labeler_b_quote",
+    "labeler_b_rationale",
+    "final_label",
+    "adjudicator",
+    "changed_from_draft",
+    "note",
+]
+
+BLIND_LABELING_HIDDEN_COLUMNS = {
+    "samplingUnit",
+    "estimationPopulation",
+    "pattern",
+    "routeStratum",
+    "linkageBucket",
+    "cellRouteCount",
+    "populationFamilyMemberships",
+    "patternSampleSize",
+    "patternSamplingFraction",
+    "analysisWeight",
+    "routeFramePopulationRecords",
+    "routeStratumSampleSize",
+    "routeStratumSamplingFraction",
+    "routeStratumAnalysisWeight",
+    "populationStrictFamilies",
+    "strictFamilySampleSize",
+    "strictFamilySamplingFraction",
+    "strictFamilyAnalysisWeight",
+    "familyPatternHasSameResourceLinked",
+    "familyPatternHasOperationTarget",
+    "familyPatternHasDomainTransitionRisk",
+    "familyPatternCancellationEvidence",
+    "strictFamilyPatternMemberships",
+    "strictFamilyApproxInclusionProbability",
+    "strictFamilyApproxAnalysisWeight",
+    "strictFamilyHasSameResourceLinked",
+    "strictFamilyHasOperationTarget",
+    "strictFamilyHasDomainTransitionRisk",
+    "strictFamilyCancellationEvidence",
+    "confidence",
+    "cancelTargetPath",
+    "routeLevelOperationLinked",
+    "operationTarget",
+    "domainTransitionRisk",
+    "adjacentOperationEvidence",
+    "terminalStateEvidence",
+    "primaryLabel",
+    "secondaryFlags",
+    "reviewerConfidence",
+    "rationale",
+    "reviewer",
+    "adjudicatedLabel",
+}
+
 
 def write_cancellation_sample(
     *,
@@ -220,7 +365,7 @@ def write_cancellation_sample(
     write_csv(target, rows, columns=SAMPLE_COLUMNS)
     write_json(
         target.with_suffix(".summary.json"),
-        sample_summary(rows),
+        sample_summary(rows, seed=seed, paths=paths),
     )
     return target, len(rows)
 
@@ -251,7 +396,7 @@ def write_cancellation_family_sample(
     write_csv(target, rows, columns=FAMILY_SAMPLE_COLUMNS)
     write_json(
         target.with_suffix(".summary.json"),
-        family_sample_summary(rows),
+        family_sample_summary(rows, seed=seed, paths=paths),
     )
     return target, len(rows)
 
@@ -282,9 +427,105 @@ def write_cancellation_route_sample(
     write_csv(target, rows, columns=ROUTE_SAMPLE_COLUMNS)
     write_json(
         target.with_suffix(".summary.json"),
-        route_sample_summary(rows),
+        route_sample_summary(rows, seed=seed, paths=paths),
     )
     return target, len(rows)
+
+
+def write_cancellation_cell_route_sample(
+    *,
+    paths: DataPaths,
+    output_path: str | Path | None = None,
+    profile: str = "full",
+    seed: int = 20260904,
+) -> tuple[Path, int]:
+    ensure_data_dirs(paths)
+    evidence = read_jsonl(paths.normalized_evidence)
+    families = read_jsonl(paths.families)
+    family_by_repo = {str(record.get("repo_id") or ""): record for record in families}
+    rows = build_cancellation_cell_route_sample_records(
+        evidence=evidence,
+        family_by_repo=family_by_repo,
+        profile=profile,
+        seed=seed,
+    )
+
+    target = (
+        Path(output_path)
+        if output_path
+        else paths.results_dir / "validation" / "http-cancellation-cell-route-sample.csv"
+    )
+    write_csv(target, rows, columns=CELL_ROUTE_SAMPLE_COLUMNS)
+    write_json(
+        target.with_suffix(".summary.json"),
+        cell_route_sample_summary(rows, seed=seed, paths=paths),
+    )
+    return target, len(rows)
+
+
+def write_blind_labeling_views(
+    *,
+    input_path: str | Path,
+    labeling_output_path: str | Path,
+    machine_output_path: str | Path,
+    seed: int = 20260904,
+    unanchored_size: int = 80,
+) -> tuple[Path, Path, int]:
+    source = Path(input_path)
+    with source.open("r", encoding="utf-8", newline="") as handle:
+        reader = csv.DictReader(handle)
+        rows = list(reader)
+        fieldnames = list(reader.fieldnames or [])
+
+    label_ids = sorted(row["sample_id"] for row in rows if row.get("sample_id"))
+    rng = random.Random(f"{seed}:unanchored-subset:{source.name}")
+    rng.shuffle(label_ids)
+    unanchored_ids = set(label_ids[: min(unanchored_size, len(label_ids))])
+
+    labeling_columns = [
+        column
+        for column in LABELING_ID_COLUMNS + LABELING_CONTEXT_COLUMNS
+        if any(column in row for row in rows)
+    ] + LABELING_WORKFLOW_COLUMNS
+    machine_columns = [
+        column
+        for column in LABELING_ID_COLUMNS + fieldnames
+        if column in fieldnames and (column in LABELING_ID_COLUMNS or column not in labeling_columns)
+    ]
+    machine_columns = list(dict.fromkeys(machine_columns))
+
+    labeling_rows: list[dict[str, str]] = []
+    machine_rows: list[dict[str, str]] = []
+    for row in rows:
+        sample_id = row.get("sample_id", "")
+        labeling_row = {column: row.get(column, "") for column in labeling_columns}
+        labeling_row.update(
+            {
+                "unanchored_subset": str(sample_id in unanchored_ids).lower(),
+                "draft_visible_to_human": str(sample_id not in unanchored_ids).lower(),
+                "draft_label": "",
+                "draft_quote": "",
+                "draft_rationale": "",
+                "labeler_a_label": "",
+                "labeler_a_quote": "",
+                "labeler_a_rationale": "",
+                "labeler_b_label": "",
+                "labeler_b_quote": "",
+                "labeler_b_rationale": "",
+                "final_label": "",
+                "adjudicator": "",
+                "changed_from_draft": "",
+                "note": "",
+            }
+        )
+        labeling_rows.append(labeling_row)
+        machine_rows.append({column: row.get(column, "") for column in machine_columns})
+
+    labeling_target = Path(labeling_output_path)
+    machine_target = Path(machine_output_path)
+    write_csv(labeling_target, labeling_rows, columns=labeling_columns)
+    write_csv(machine_target, machine_rows, columns=machine_columns)
+    return labeling_target, machine_target, len(rows)
 
 
 def build_cancellation_sample_records(
@@ -295,6 +536,98 @@ def build_cancellation_sample_records(
     seed: int = 20260904,
 ) -> list[dict[str, str]]:
     sample_sizes = sample_size_profile(profile)
+    rows_by_pattern_family, strict_patterns_by_family = cancellation_rows_by_pattern_family(
+        evidence=evidence,
+        family_by_repo=family_by_repo,
+        patterns=set(sample_sizes),
+    )
+    return select_family_pattern_sample(
+        rows_by_pattern_family=rows_by_pattern_family,
+        strict_patterns_by_family=strict_patterns_by_family,
+        sample_sizes=sample_sizes,
+        seed=seed,
+    )
+
+
+def build_cancellation_cell_route_sample_records(
+    *,
+    evidence: list[dict[str, Any]],
+    family_by_repo: dict[str, dict[str, Any]],
+    profile: str = "full",
+    seed: int = 20260904,
+) -> list[dict[str, str]]:
+    sample_sizes = sample_size_profile(profile)
+    rows_by_pattern_family, strict_patterns_by_family = cancellation_rows_by_pattern_family(
+        evidence=evidence,
+        family_by_repo=family_by_repo,
+        patterns=set(sample_sizes),
+    )
+    selected_cells = select_family_pattern_sample(
+        rows_by_pattern_family=rows_by_pattern_family,
+        strict_patterns_by_family=strict_patterns_by_family,
+        sample_sizes=sample_sizes,
+        seed=seed,
+    )
+
+    expanded_rows: list[dict[str, str]] = []
+    for cell_row in selected_cells:
+        cell_rows = sorted(
+            rows_by_pattern_family[cell_row["pattern"]][cell_row["family_id"]],
+            key=row_quality_key,
+        )
+        for ordinal, route_row in enumerate(cell_rows, start=1):
+            expanded = dict(route_row)
+            for column in SAMPLE_COLUMNS:
+                if column in {
+                    "sample_id",
+                    "route_id",
+                    "evidence_id",
+                    "httpMethod",
+                    "normalizedPath",
+                    "path",
+                    "sourceKind",
+                    "file",
+                    "lineStart",
+                    "commit",
+                    "symbol",
+                    "responseCodes",
+                    "confidence",
+                    "cancelTargetPath",
+                    "routeLevelOperationLinked",
+                    "operationTarget",
+                    "domainTransitionRisk",
+                    "adjacentOperationEvidence",
+                    "terminalStateEvidence",
+                    "responseSemanticsEvidence",
+                    "primaryLabel",
+                    "secondaryFlags",
+                    "reviewerConfidence",
+                    "rationale",
+                    "reviewer",
+                    "adjudicatedLabel",
+                }:
+                    continue
+                expanded[column] = cell_row[column]
+            expanded.update(
+                {
+                    "sample_id": f"{cell_row['sample_id']}-route-{ordinal:03d}",
+                    "cell_sample_id": cell_row["sample_id"],
+                    "cellRouteOrdinal": str(ordinal),
+                    "samplingUnit": "family-pattern-cell-route",
+                    "cellRouteCount": cell_row["cellRouteCount"],
+                    "linkageBucket": cell_row["linkageBucket"],
+                }
+            )
+            expanded_rows.append(expanded)
+    return expanded_rows
+
+
+def cancellation_rows_by_pattern_family(
+    *,
+    evidence: list[dict[str, Any]],
+    family_by_repo: dict[str, dict[str, Any]],
+    patterns: set[str],
+) -> tuple[dict[str, dict[str, list[dict[str, str]]]], dict[str, set[str]]]:
     async_paths_by_repo = async_operation_paths_by_repo(
         evidence=evidence,
         family_by_repo=family_by_repo,
@@ -309,7 +642,7 @@ def build_cancellation_sample_records(
         if str(record.get("concept") or "") != "http-cancellation":
             continue
         pattern = str(record.get("pattern") or "")
-        if pattern not in sample_sizes:
+        if pattern not in patterns:
             continue
         repo_id = str(record.get("repository") or "")
         family_id = included_family_id(repo_id, family_by_repo)
@@ -327,13 +660,23 @@ def build_cancellation_sample_records(
         )
         rows_by_pattern_family[pattern][family_id].append(row)
 
-    grouped = group_family_pattern_representatives(rows_by_pattern_family)
-    strict_patterns_by_family = strict_pattern_memberships_by_family(rows_by_pattern_family)
+    return rows_by_pattern_family, strict_pattern_memberships_by_family(rows_by_pattern_family)
 
+
+def select_family_pattern_sample(
+    *,
+    rows_by_pattern_family: dict[str, dict[str, list[dict[str, str]]]],
+    strict_patterns_by_family: dict[str, set[str]],
+    sample_sizes: dict[str, int],
+    seed: int,
+) -> list[dict[str, str]]:
+    grouped = group_family_pattern_representatives(rows_by_pattern_family, seed=seed)
     selected: list[dict[str, str]] = []
     repository_pattern_counts: Counter[tuple[str, str]] = Counter()
     repository_total_counts: Counter[str] = Counter()
     for pattern in PATTERN_ORDER:
+        if pattern not in sample_sizes:
+            continue
         selected.extend(
             select_pattern_rows(
                 pattern=pattern,
@@ -459,7 +802,10 @@ def build_cancellation_family_sample_records(
         )
         rows_by_family[family_id].append(row)
 
-    family_rows = [strict_family_representative(family_id, rows) for family_id, rows in rows_by_family.items()]
+    family_rows = [
+        strict_family_representative(family_id, rows, seed=seed)
+        for family_id, rows in rows_by_family.items()
+    ]
     family_rows.sort(key=lambda row: row["family_id"])
     rng = random.Random(f"{seed}:strict-cancellation-family")
     rng.shuffle(family_rows)
@@ -518,6 +864,8 @@ def async_evidence_index(
 
 def group_family_pattern_representatives(
     rows_by_pattern_family: dict[str, dict[str, list[dict[str, str]]]],
+    *,
+    seed: int,
 ) -> dict[str, dict[str, dict[str, list[dict[str, str]]]]]:
     grouped: dict[str, dict[str, dict[str, list[dict[str, str]]]]] = defaultdict(
         lambda: defaultdict(lambda: defaultdict(list))
@@ -527,7 +875,13 @@ def group_family_pattern_representatives(
             has_same_resource = any(row["routeLevelOperationLinked"] == "true" for row in rows)
             has_operation_target = any(row["operationTarget"] == "true" for row in rows)
             has_domain_risk = any(row["domainTransitionRisk"] == "true" for row in rows)
-            representative = sorted(rows, key=row_quality_key)[0]
+            representative = select_cell_representative(
+                family_id=family_id,
+                pattern=pattern,
+                rows=rows,
+                seed=seed,
+            )
+            representative["cellRouteCount"] = str(len(rows))
             representative["linkageBucket"] = family_pattern_bucket(
                 has_same_resource=has_same_resource,
                 has_operation_target=has_operation_target,
@@ -551,12 +905,22 @@ def strict_pattern_memberships_by_family(
     return memberships
 
 
-def strict_family_representative(family_id: str, rows: list[dict[str, str]]) -> dict[str, str]:
+def strict_family_representative(
+    family_id: str,
+    rows: list[dict[str, str]],
+    *,
+    seed: int,
+) -> dict[str, str]:
     has_same_resource = any(row["routeLevelOperationLinked"] == "true" for row in rows)
     has_operation_target = any(row["operationTarget"] == "true" for row in rows)
     has_domain_risk = any(row["domainTransitionRisk"] == "true" for row in rows)
     patterns = {row["pattern"] for row in rows}
-    representative = dict(sorted(rows, key=row_quality_key)[0])
+    representative = select_cell_representative(
+        family_id=family_id,
+        pattern="strict-cancellation-family",
+        rows=rows,
+        seed=seed,
+    )
     representative.update(
         {
             "sample_id": "",
@@ -762,13 +1126,17 @@ def sample_row(
     adjacent_records: list[dict[str, Any]],
 ) -> dict[str, str]:
     response_codes = ",".join(str(code) for code in record.get("responseCodes") or [])
+    route_id = stable_route_id(record)
     return {
         "sample_id": "",
+        "route_id": route_id,
+        "evidence_id": stable_evidence_id(record, route_id=route_id),
         "samplingUnit": "family-pattern-representative",
         "estimationPopulation": "",
         "family_id": family_id,
         "repository": str(record.get("repository") or ""),
         "pattern": str(record.get("pattern") or ""),
+        "cellRouteCount": "",
         "linkageBucket": str(linkage.get("linkageBucket") or ""),
         "populationFamilyMemberships": "",
         "patternSampleSize": "",
@@ -858,14 +1226,29 @@ def route_sample_stratum(*, pattern: str, linkage: dict[str, Any]) -> str:
     return f"{pattern}:any"
 
 
-def row_quality_key(row: dict[str, str]) -> tuple[int, int, int, float, str, int]:
+def select_cell_representative(
+    *,
+    family_id: str,
+    pattern: str,
+    rows: list[dict[str, str]],
+    seed: int,
+) -> dict[str, str]:
+    candidates = sorted(rows, key=row_quality_key)
+    rng = random.Random(f"{seed}:cell-route:{pattern}:{family_id}")
+    return dict(candidates[rng.randrange(len(candidates))])
+
+
+def row_quality_key(row: dict[str, str]) -> tuple[str, str, str, str, str, str, int, str, str]:
     return (
-        0 if row["routeLevelOperationLinked"] == "true" else 1,
-        0 if row["sourceKind"] == "source" else 1,
-        0 if "202" in row["responseCodes"].split(",") else 1,
-        -safe_float(row["confidence"]),
-        row["file"],
+        row["repository"],
+        row["pattern"],
+        row["httpMethod"],
+        row["normalizedPath"],
+        row["path"],
+        row["sourceKind"],
         safe_int(row["lineStart"]),
+        row["file"],
+        row["evidence_id"],
     )
 
 
@@ -877,6 +1260,36 @@ def route_sample_key(row: dict[str, str]) -> tuple[str, str, str, str, int]:
         row["file"],
         safe_int(row["lineStart"]),
     )
+
+
+def stable_route_id(record: dict[str, Any]) -> str:
+    return stable_digest(
+        [
+            record.get("repository"),
+            record.get("httpMethod"),
+            record.get("normalizedPath") or record.get("path"),
+        ]
+    )
+
+
+def stable_evidence_id(record: dict[str, Any], *, route_id: str) -> str:
+    return stable_digest(
+        [
+            route_id,
+            record.get("commit"),
+            record.get("pattern"),
+            record.get("sourceKind"),
+            record.get("path"),
+            record.get("file"),
+            record.get("lineStart"),
+            record.get("symbol"),
+        ]
+    )
+
+
+def stable_digest(parts: list[Any]) -> str:
+    payload = "\x1f".join(str(part or "") for part in parts)
+    return hashlib.sha256(payload.encode("utf-8")).hexdigest()
 
 
 def format_evidence(records: list[dict[str, Any]], *, limit: int = 3) -> str:
@@ -935,10 +1348,21 @@ def evidence_sort_key(record: dict[str, Any]) -> tuple[str, str, int]:
     )
 
 
-def sample_summary(rows: list[dict[str, str]]) -> dict[str, Any]:
+def sample_summary(rows: list[dict[str, str]], *, seed: int, paths: DataPaths) -> dict[str, Any]:
     by_pattern = Counter(row["pattern"] for row in rows)
     by_bucket = Counter(row["linkageBucket"] for row in rows)
     by_population = Counter(row["estimationPopulation"] for row in rows)
+    by_source_kind = Counter(row["sourceKind"] for row in rows)
+    by_source_kind_pattern: dict[str, dict[str, int]] = defaultdict(dict)
+    for (source_kind, pattern), count in sorted(
+        Counter((row["sourceKind"], row["pattern"]) for row in rows).items()
+    ):
+        by_source_kind_pattern[source_kind][pattern] = count
+    cell_route_counts = [
+        safe_int(row["cellRouteCount"])
+        for row in rows
+        if row.get("cellRouteCount")
+    ]
     population_by_pattern = {
         pattern: safe_int(next(row["populationFamilyMemberships"] for row in rows if row["pattern"] == pattern))
         for pattern in by_pattern
@@ -949,7 +1373,34 @@ def sample_summary(rows: list[dict[str, str]]) -> dict[str, Any]:
         "byPattern": dict(sorted(by_pattern.items())),
         "byLinkageBucket": dict(sorted(by_bucket.items())),
         "byEstimationPopulation": dict(sorted(by_population.items())),
+        "bySourceKind": dict(sorted(by_source_kind.items())),
+        "bySourceKindByPattern": {
+            source_kind: dict(sorted(patterns.items()))
+            for source_kind, patterns in sorted(by_source_kind_pattern.items())
+        },
+        "cellRouteCounts": {
+            "selectedCells": len(cell_route_counts),
+            "selectedRouteRecords": sum(cell_route_counts),
+            "extraRouteLabelsIfClusterCensus": sum(cell_route_counts) - len(cell_route_counts),
+            "distribution": {
+                str(count): frequency
+                for count, frequency in sorted(Counter(cell_route_counts).items())
+            },
+        },
         "populationFamilyMembershipsByPattern": dict(sorted(population_by_pattern.items())),
+        "selectionProvenance": {
+            **sampling_provenance(paths=paths, seed=seed),
+            "seed": seed,
+            "familyPatternRepresentative": (
+                "Uniform pseudo-random route selection within each family_id x pattern cell "
+                "after stable identity sorting. Automated linkage, HTTP 202 responses, "
+                "source kind, and confidence are not used as preferential keys."
+            ),
+            "cellRouteSeedNamespace": "{seed}:cell-route:{pattern}:{family_id}",
+            "familyQueueSeedNamespace": "{seed}:{pattern}:{bucket}",
+            "routeId": "sha256(repository, httpMethod, normalizedPath-or-path)",
+            "evidenceId": "sha256(route_id, commit, pattern, sourceKind, path, file, lineStart, symbol)",
+        },
         "estimationGuidance": {
             "doNotPoolRawRows": True,
             "strictCancellation": (
@@ -972,14 +1423,15 @@ def sample_summary(rows: list[dict[str, str]]) -> dict[str, Any]:
                 "plus an explicit non-ambiguous rate."
             ),
             "confidenceIntervals": (
-                "Use Wilson or Clopper-Pearson intervals for sampled strata, add finite-population "
-                "correction for near-census strata, and mark full-census strata separately."
+                "Use Clopper-Pearson intervals as the primary interval for sampled strata, "
+                "add finite-population corrected Wilson intervals as a secondary sensitivity "
+                "view where applicable, and mark full-census strata separately."
             ),
         },
     }
 
 
-def family_sample_summary(rows: list[dict[str, str]]) -> dict[str, Any]:
+def family_sample_summary(rows: list[dict[str, str]], *, seed: int, paths: DataPaths) -> dict[str, Any]:
     by_pattern_count = Counter(str(len(row["strictFamilyPatternMemberships"].split(","))) for row in rows)
     by_bucket = Counter(row["linkageBucket"] for row in rows)
     population_count = safe_int(rows[0]["populationStrictFamilies"]) if rows else 0
@@ -993,6 +1445,17 @@ def family_sample_summary(rows: list[dict[str, str]]) -> dict[str, Any]:
         "analysisWeight": format_float(population_count / sample_count if sample_count else 0.0),
         "byLinkageBucket": dict(sorted(by_bucket.items())),
         "byStrictFamilyPatternMembershipCount": dict(sorted(by_pattern_count.items())),
+        "selectionProvenance": {
+            **sampling_provenance(paths=paths, seed=seed),
+            "seed": seed,
+            "familyRepresentative": (
+                "Uniform pseudo-random route selection within each strict family after stable "
+                "identity sorting; automated linkage and HTTP 202 responses are not preferential keys."
+            ),
+            "familyRouteSeedNamespace": "{seed}:cell-route:strict-cancellation-family:{family_id}",
+            "routeId": "sha256(repository, httpMethod, normalizedPath-or-path)",
+            "evidenceId": "sha256(route_id, commit, pattern, sourceKind, path, file, lineStart, symbol)",
+        },
         "estimationGuidance": {
             "purpose": (
                 "Use this sheet, not the pattern-family sheet, when updating unique-family "
@@ -1014,7 +1477,7 @@ def family_sample_summary(rows: list[dict[str, str]]) -> dict[str, Any]:
     }
 
 
-def route_sample_summary(rows: list[dict[str, str]]) -> dict[str, Any]:
+def route_sample_summary(rows: list[dict[str, str]], *, seed: int, paths: DataPaths) -> dict[str, Any]:
     by_stratum = Counter(row["routeStratum"] for row in rows)
     by_pattern = Counter(row["pattern"] for row in rows)
     by_linkage = Counter("linked" if row["routeLevelOperationLinked"] == "true" else "unlinked" for row in rows)
@@ -1030,6 +1493,14 @@ def route_sample_summary(rows: list[dict[str, str]]) -> dict[str, Any]:
         "byPattern": dict(sorted(by_pattern.items())),
         "byRouteLevelLinkage": dict(sorted(by_linkage.items())),
         "populationRouteRecordsByStratum": dict(sorted(population_by_stratum.items())),
+        "selectionProvenance": {
+            **sampling_provenance(paths=paths, seed=seed),
+            "seed": seed,
+            "routeRecordSelection": "Uniform pseudo-random route selection within each exclusive route stratum.",
+            "routeRecordSeedNamespace": "{seed}:route-record:{stratum}",
+            "routeId": "sha256(repository, httpMethod, normalizedPath-or-path)",
+            "evidenceId": "sha256(route_id, commit, pattern, sourceKind, path, file, lineStart, symbol)",
+        },
         "estimationGuidance": {
             "purpose": (
                 "Use this sheet for route-record operation-vs-domain cancellation precision. "
@@ -1049,6 +1520,87 @@ def route_sample_summary(rows: list[dict[str, str]]) -> dict[str, Any]:
             ),
         },
     }
+
+
+def cell_route_sample_summary(rows: list[dict[str, str]], *, seed: int, paths: DataPaths) -> dict[str, Any]:
+    by_pattern = Counter(row["pattern"] for row in rows)
+    by_cell = Counter(row["cell_sample_id"] for row in rows)
+    by_source_kind = Counter(row["sourceKind"] for row in rows)
+    cell_sizes = list(by_cell.values())
+    return {
+        "samplingUnit": "family-pattern-cell-route",
+        "estimationPopulation": "sampled-family-pattern-cell-routes",
+        "sampleCount": len(rows),
+        "sampledCells": len(by_cell),
+        "byPattern": dict(sorted(by_pattern.items())),
+        "bySourceKind": dict(sorted(by_source_kind.items())),
+        "cellRouteCounts": {
+            "distribution": {
+                str(count): frequency
+                for count, frequency in sorted(Counter(cell_sizes).items())
+            },
+            "selectedCells": len(cell_sizes),
+            "selectedRouteRecords": sum(cell_sizes),
+            "extraRouteLabelsOverRepresentatives": sum(cell_sizes) - len(cell_sizes),
+        },
+        "selectionProvenance": {
+            **sampling_provenance(paths=paths, seed=seed),
+            "seed": seed,
+            "cellSelection": (
+                "Uses the same sampled family_id x pattern cells as the pattern-family "
+                "representative sheet, then includes every cancellation route record in each selected cell."
+            ),
+            "routeId": "sha256(repository, httpMethod, normalizedPath-or-path)",
+            "evidenceId": "sha256(route_id, commit, pattern, sourceKind, path, file, lineStart, symbol)",
+        },
+        "estimationGuidance": {
+            "purpose": (
+                "Use this companion sheet when manual labeling needs to observe within-cell "
+                "operation/domain mixing. Aggregate route labels back to cell_sample_id before "
+                "estimating pattern-family membership precision."
+            ),
+            "doNotUseAsRouteFrame": True,
+            "blinding": (
+                "Create a separate reviewer view that hides automated linkage columns before labeling."
+            ),
+        },
+    }
+
+
+def sampling_provenance(*, paths: DataPaths, seed: int) -> dict[str, str | int]:
+    return {
+        "seed": seed,
+        "samplingCodeCommit": sampling_code_commit(),
+        "pythonVersion": sys.version.split()[0],
+        "frameSnapshotHash": frame_snapshot_hash(paths),
+    }
+
+
+def sampling_code_commit() -> str:
+    override = os.environ.get("RFC_MINER_SAMPLING_CODE_COMMIT")
+    if override:
+        return override
+    try:
+        return subprocess.check_output(
+            ["git", "rev-parse", "HEAD"],
+            cwd=Path(__file__).resolve().parents[2],
+            text=True,
+            stderr=subprocess.DEVNULL,
+        ).strip()
+    except (OSError, subprocess.CalledProcessError):
+        return "unknown"
+
+
+def frame_snapshot_hash(paths: DataPaths) -> str:
+    digest = hashlib.sha256()
+    for source in (paths.normalized_evidence, paths.families):
+        digest.update(source.name.encode("utf-8"))
+        digest.update(b"\0")
+        with source.open("rb") as handle:
+            for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+                digest.update(chunk)
+        digest.update(b"\0")
+    return digest.hexdigest()
 
 
 def write_csv(path: Path, rows: list[dict[str, str]], *, columns: list[str]) -> None:

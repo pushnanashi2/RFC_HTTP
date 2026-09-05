@@ -13,6 +13,8 @@ from .normalization import normalize_evidence
 from .paths import data_paths
 from .reporting import write_report
 from .sampling import (
+    write_blind_labeling_views,
+    write_cancellation_cell_route_sample,
     write_cancellation_family_sample,
     write_cancellation_route_sample,
     write_cancellation_sample,
@@ -100,6 +102,26 @@ def build_parser() -> argparse.ArgumentParser:
     cancellation_route_sample.add_argument("--output")
     cancellation_route_sample.add_argument("--profile", choices=["full", "minimum"], default="full")
     cancellation_route_sample.add_argument("--seed", type=int, default=20260904)
+
+    cancellation_cell_route_sample = subcommands.add_parser(
+        "sample-cancellation-cell-routes",
+        help="write all route records inside sampled HTTP cancellation family-pattern cells",
+    )
+    add_common(cancellation_cell_route_sample)
+    cancellation_cell_route_sample.add_argument("--output")
+    cancellation_cell_route_sample.add_argument("--profile", choices=["full", "minimum"], default="full")
+    cancellation_cell_route_sample.add_argument("--seed", type=int, default=20260904)
+
+    split_labeling_view = subcommands.add_parser(
+        "split-cancellation-labeling-view",
+        help="split a cancellation sample into a blinded reviewer view and machine metadata table",
+    )
+    add_common(split_labeling_view)
+    split_labeling_view.add_argument("--input", required=True)
+    split_labeling_view.add_argument("--labeling-output", required=True)
+    split_labeling_view.add_argument("--machine-output", required=True)
+    split_labeling_view.add_argument("--seed", type=int, default=20260904)
+    split_labeling_view.add_argument("--unanchored-size", type=int, default=80)
 
     run = subcommands.add_parser("run", help="run the full pipeline")
     add_common(run)
@@ -229,6 +251,30 @@ def main(argv: list[str] | None = None) -> int:
             seed=args.seed,
         )
         print(f"cancellation route sample: {output}; rows: {count}")
+        return 0
+
+    if args.command == "sample-cancellation-cell-routes":
+        output, count = write_cancellation_cell_route_sample(
+            paths=paths,
+            output_path=args.output,
+            profile=args.profile,
+            seed=args.seed,
+        )
+        print(f"cancellation cell route sample: {output}; rows: {count}")
+        return 0
+
+    if args.command == "split-cancellation-labeling-view":
+        labeling_output, machine_output, count = write_blind_labeling_views(
+            input_path=args.input,
+            labeling_output_path=args.labeling_output,
+            machine_output_path=args.machine_output,
+            seed=args.seed,
+            unanchored_size=args.unanchored_size,
+        )
+        print(
+            "cancellation labeling view: "
+            f"{labeling_output}; machine metadata: {machine_output}; rows: {count}"
+        )
         return 0
 
     if args.command == "run":
