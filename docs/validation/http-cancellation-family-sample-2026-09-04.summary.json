@@ -22,5 +22,15 @@
   "populationStrictFamilies": 407,
   "sampleCount": 140,
   "samplingFraction": "0.343980",
-  "samplingUnit": "strict-cancellation-family"
+  "samplingUnit": "strict-cancellation-family",
+  "selectionProvenance": {
+    "evidenceId": "sha256(route_id, commit, pattern, sourceKind, path, file, lineStart, symbol)",
+    "familyRepresentative": "Uniform pseudo-random route selection within each strict family after stable identity sorting; automated linkage and HTTP 202 responses are not preferential keys.",
+    "familyRouteSeedNamespace": "{seed}:cell-route:strict-cancellation-family:{family_id}",
+    "frameSnapshotHash": "36035d4b0fc6d94b0342fe196b20d4ff4ac26c6fb44d607e9909d4acf4f07da5",
+    "pythonVersion": "3.10.12",
+    "routeId": "sha256(repository, httpMethod, normalizedPath-or-path)",
+    "samplingCodeCommit": "1e5a293639ca061e68285c87dbc83797e1256bc6",
+    "seed": 20260904
+  }
 }

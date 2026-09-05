@@ -1,28 +1,70 @@
 {
   "byEstimationPopulation": {
-    "delete-operation-resource-audit": 50,
-    "strict-cancellation": 210
+    "delete-operation-resource-audit": 100,
+    "strict-cancellation": 196
   },
   "byLinkageBucket": {
-    "domain-transition-risk": 77,
+    "domain-transition-risk": 69,
     "mixed-operation-target-and-risk": 18,
     "mixed-same-resource-and-risk": 32,
     "operation-like-target": 38,
     "other": 7,
-    "same-resource-linked": 88
+    "same-resource-linked": 132
   },
   "byPattern": {
-    "delete-action-cancel": 30,
-    "delete-operation-resource": 50,
+    "delete-action-cancel": 31,
+    "delete-operation-resource": 100,
     "get-cancel-link": 18,
     "patch-state-cancelled": 5,
-    "post-action-cancel": 50,
+    "post-action-cancel": 35,
     "post-subresource-cancel": 80,
     "put-action-cancel": 27
   },
+  "bySourceKind": {
+    "openapi": 84,
+    "source": 212
+  },
+  "bySourceKindByPattern": {
+    "openapi": {
+      "delete-action-cancel": 15,
+      "delete-operation-resource": 26,
+      "get-cancel-link": 6,
+      "patch-state-cancelled": 3,
+      "post-action-cancel": 5,
+      "post-subresource-cancel": 19,
+      "put-action-cancel": 10
+    },
+    "source": {
+      "delete-action-cancel": 16,
+      "delete-operation-resource": 74,
+      "get-cancel-link": 12,
+      "patch-state-cancelled": 2,
+      "post-action-cancel": 30,
+      "post-subresource-cancel": 61,
+      "put-action-cancel": 17
+    }
+  },
+  "cellRouteCounts": {
+    "distribution": {
+      "1": 150,
+      "10": 2,
+      "12": 1,
+      "2": 76,
+      "3": 28,
+      "4": 17,
+      "5": 8,
+      "6": 9,
+      "7": 1,
+      "8": 3,
+      "9": 1
+    },
+    "extraRouteLabelsIfClusterCensus": 324,
+    "selectedCells": 296,
+    "selectedRouteRecords": 620
+  },
   "estimationGuidance": {
     "ambiguous": "Report ambiguous-as-false-positive and ambiguous-as-true-positive bounds, plus an explicit non-ambiguous rate.",
-    "confidenceIntervals": "Use Wilson or Clopper-Pearson intervals for sampled strata, add finite-population correction for near-census strata, and mark full-census strata separately.",
+    "confidenceIntervals": "Use Clopper-Pearson intervals as the primary interval for sampled strata, add finite-population corrected Wilson intervals as a secondary sensitivity view where applicable, and mark full-census strata separately.",
     "deleteOperationResource": "Report separately as an audit stratum for possible strict-rule promotion; do not mix it into strict-cancellation estimates.",
     "doNotPoolRawRows": true,
     "strictCancellation": "Compute per-pattern rates and a pattern-family weighted estimate using populationFamilyMemberships. This estimates pattern-family membership precision, not unique-family prevalence over 407 families.",
@@ -37,6 +79,17 @@
     "post-subresource-cancel": 330,
     "put-action-cancel": 27
   },
-  "sampleCount": 260,
-  "samplingUnit": "family-pattern-representative"
+  "sampleCount": 296,
+  "samplingUnit": "family-pattern-representative",
+  "selectionProvenance": {
+    "cellRouteSeedNamespace": "{seed}:cell-route:{pattern}:{family_id}",
+    "evidenceId": "sha256(route_id, commit, pattern, sourceKind, path, file, lineStart, symbol)",
+    "familyPatternRepresentative": "Uniform pseudo-random route selection within each family_id x pattern cell after stable identity sorting. Automated linkage, HTTP 202 responses, source kind, and confidence are not used as preferential keys.",
+    "familyQueueSeedNamespace": "{seed}:{pattern}:{bucket}",
+    "frameSnapshotHash": "36035d4b0fc6d94b0342fe196b20d4ff4ac26c6fb44d607e9909d4acf4f07da5",
+    "pythonVersion": "3.10.12",
+    "routeId": "sha256(repository, httpMethod, normalizedPath-or-path)",
+    "samplingCodeCommit": "1e5a293639ca061e68285c87dbc83797e1256bc6",
+    "seed": 20260904
+  }
 }
