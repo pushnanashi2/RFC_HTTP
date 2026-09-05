@@ -30,7 +30,7 @@
     "frameSnapshotHash": "36035d4b0fc6d94b0342fe196b20d4ff4ac26c6fb44d607e9909d4acf4f07da5",
     "pythonVersion": "3.10.12",
     "routeId": "sha256(repository, httpMethod, normalizedPath-or-path)",
-    "samplingCodeCommit": "dfff3b1d0174fc09924e48147f10a41b53496245",
+    "samplingCodeCommit": "dc24a32c27603539079015a9aded627bc9342f36",
     "seed": 20260904
   }
 }

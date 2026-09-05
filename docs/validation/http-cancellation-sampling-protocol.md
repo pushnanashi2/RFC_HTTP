@@ -24,7 +24,7 @@ The protocol reports three separate layers:
 | Layer | Unit | Use |
 | --- | --- | --- |
 | Strict cancellation frame | `family_id` × strict pattern cell | Primary operation-vs-domain validation |
-| Linked `delete-operation-resource` audit | `family_id` × `delete-operation-resource` cell with same-resource async linkage | Promotion audit for the weak DELETE heuristic |
+| `delete-operation-resource` audit | `family_id` × `delete-operation-resource` cell | Distinguish cancellation from deletion or archival, including the unlinked boundary stratum |
 | Async-family linkage envelope | async-operation family | Motivation guardrail only, not estimated by this sample |
 
 Do not report a single pooled TP rate over all rows. Route rows inside one cell
@@ -53,10 +53,10 @@ Generated validation artifacts:
 
 | Artifact | Rows | Purpose |
 | --- | ---: | --- |
-| `docs/validation/http-cancellation-sample-2026-09-04.csv` | 296 cells | Cell-level sample and machine metadata |
-| `docs/validation/http-cancellation-cell-route-sample-2026-09-04.csv` | 611 route rows | All route records inside selected cells |
-| `docs/validation/http-cancellation-cell-route-labeling-view-2026-09-04.csv` | 611 route rows | Blinded reviewer worksheet |
-| `docs/validation/http-cancellation-cell-route-machine-columns-2026-09-04.csv` | 611 route rows | Hidden machine columns keyed by `evidence_id` |
+| `docs/validation/http-cancellation-sample-2026-09-04.csv` | 320 cells | Cell-level sample and machine metadata |
+| `docs/validation/http-cancellation-cell-route-sample-2026-09-04.csv` | 635 route rows | All route records inside selected cells |
+| `docs/validation/http-cancellation-cell-route-labeling-view-2026-09-04.csv` | 635 route rows | Blinded reviewer worksheet |
+| `docs/validation/http-cancellation-cell-route-machine-columns-2026-09-04.csv` | 635 route rows | Hidden machine columns keyed by `evidence_id` |
 | `docs/validation/http-cancellation-family-sample-2026-09-04.csv` | 140 families | Descriptive strict-family sensitivity sample |
 | `docs/validation/http-cancellation-route-sample-2026-09-04.csv` | 377 routes | Descriptive route-frame sensitivity sample |
 
@@ -72,22 +72,21 @@ Strict cancellation cell frame:
 | `patch-state-cancelled` | 5 | 5 | 100.0% | 8 |
 | **Strict total** | **517** | **196** | — | **407** |
 
-Linked `delete-operation-resource` audit frame:
+`delete-operation-resource` audit frame:
 
 | Bucket | Population cells | Sampled cells | Cell sampling fraction | Route records in selected cells |
 | --- | ---: | ---: | ---: | ---: |
-| `delete-only-linked` | 88 | 70 | 79.5% | 143 |
-| `delete-and-strict-different-resource` | 47 | 15 | 31.9% | 36 |
+| `delete-only-linked` | 88 | 55 | 62.5% | 99 |
+| `delete-and-strict-different-resource` | 47 | 30 | 63.8% | 67 |
 | `delete-and-strict-same-resource` | 49 | 15 | 30.6% | 25 |
-| `delete-unlinked` | 24 | 0 | 0.0% | 0 |
-| **Linked DELETE audit total** | **184** | **100** | — | **204** |
+| `delete-unlinked` | 24 | 24 | 100.0% | 37 |
+| **DELETE audit total** | **208** | **124** | — | **228** |
 
 The full observed cancellation membership frame contains 725 cells: 517 strict
 cells plus 208 `delete-operation-resource` cells. The inferential validation
-frame in this protocol is 701 cells: 517 strict cells plus the 184 linked
-`delete-operation-resource` audit cells. The 24 unlinked DELETE cells are
-descriptive only because they do not affect the operation-resource linkage
-envelope.
+frame in this protocol is the same 725-cell frame. The 24 unlinked DELETE cells
+are included as a full-census boundary stratum, but they do not affect the
+same-resource linkage envelope unless they are reported separately.
 
 ## 3. Resource-Level Linkage Envelope
 
@@ -102,8 +101,10 @@ async-family denominator. The linkage envelope uses 631 async-operation families
 | Union of the two linked sets | 282 | 631 | 44.7% |
 
 The family-level structural envelope is therefore 194/631 to 282/631 before
-manual labels. The upper end is not `194 + 184`; overlap families prevent double
-counting.
+manual labels. This 30.7% to 44.7% range is a structural bounding interval, not
+a confidence interval and not a prevalence estimate. The upper end means "all
+linked DELETE audit candidates are cancellation" and is not `194 + 184` because
+overlap families prevent double counting.
 
 Resource-level overlap is smaller than family-level overlap:
 
@@ -119,6 +120,12 @@ same operation resource as an explicit strict cancel route, while 47 have strict
 cancel evidence elsewhere in the same family. This distinction is used for
 DELETE audit allocation, but it does not change the family-level upper envelope:
 families already counted by the strict lower subset remain counted once.
+
+The two overlap levels intentionally disagree: 96/184 linked DELETE families
+also have strict linked cancel evidence somewhere in the family, but only 57/362
+linked DELETE operation resources overlap with a strict linked operation
+resource. That 52.2% family overlap versus 15.7% resource overlap is direct
+evidence that family-level summaries can hide different-resource structure.
 
 ## 4. Primary-Pattern Assignment and Identifiers
 
@@ -139,6 +146,17 @@ primary-pattern assignment, all generated CSVs have zero cross-pattern
 share a `route_id`; those are independent evidence rows for the same route and
 are joined by `evidence_id`.
 
+Earlier unassigned frame reports counted 185 linked DELETE families and 97
+overlap families. The current assigned frame counts 184 and 96. That one-family
+movement is a definition change caused by deterministic primary-pattern
+assignment, not a correction to the older unassigned run.
+
+Route-row totals can change while the selected cell total is unchanged because
+the companion sheet expands every route record inside each selected cell. The
+620-to-611 change in the prior run was entirely in `delete-operation-resource`
+route rows: strict rows remained 407, while selected DELETE cell contents moved
+from 213 to 204 after primary-pattern assignment and bucketed reselection.
+
 Identifiers:
 
 | Column | Definition | Scope |
@@ -154,7 +172,7 @@ Sampling provenance is stored in each `.summary.json` sidecar rather than in
 every CSV row. The current cell sample summary records:
 
 - `seed`: `20260904`
-- `samplingCodeCommit`: `dfff3b1d0174fc09924e48147f10a41b53496245`
+- `samplingCodeCommit`: `dc24a32c27603539079015a9aded627bc9342f36`
 - `pythonVersion`: `3.10.12`
 - `frameSnapshotHash`: `36035d4b0fc6d94b0342fe196b20d4ff4ac26c6fb44d607e9909d4acf4f07da5`
 
@@ -169,9 +187,9 @@ Cell selection:
 - sort family IDs before shuffling;
 - shuffle with `random.Random(f"{seed}:{pattern}:{bucket}")`;
 - cap each repository at two rows per pattern and five rows total;
-- for `delete-operation-resource`, sample 70 cells from `delete-only-linked`,
-  15 from `delete-and-strict-different-resource`, and 15 from
-  `delete-and-strict-same-resource`.
+- for `delete-operation-resource`, sample 55 cells from `delete-only-linked`,
+  30 from `delete-and-strict-different-resource`, 15 from
+  `delete-and-strict-same-resource`, and all 24 from `delete-unlinked`.
 
 Representative route selection inside a selected cell:
 
@@ -264,10 +282,12 @@ Workflow:
 5. Aggregate route labels back to `cell_sample_id` before computing cell-stratum
    estimates.
 
-The worksheet contains an `unanchored_subset` marker for 80 sampled cells. For
-those cells, human reviewers must not see the LLM draft before recording
-independent labels. Use that subset to estimate anchoring effects and
-human-human agreement.
+The worksheet contains an `unanchored_subset` marker for 80 sampled cells. Those
+cells are selected by deterministic stratum-aware allocation over the generated
+cell sheet: each non-empty selected stratum gets at least one cell when capacity
+allows, and the remaining cells are allocated proportionally. For those cells,
+human reviewers must not see the LLM draft before recording independent labels.
+Use that subset to estimate anchoring effects and human-human agreement.
 
 ## 8. Adjudication and Agreement
 
@@ -314,9 +334,10 @@ For each stratum `h`, selected cell `i`, and route record `j`:
 average of cell-level proportions when cell sizes differ.
 
 For the strict overall estimate, combine strict strata with known frame totals.
-For the linked DELETE audit, combine the three linked DELETE buckets separately.
-Do not combine DELETE audit rows into the strict denominator unless the strict
-definition is explicitly changed.
+For the DELETE audit, combine the four DELETE buckets separately and keep the
+unlinked census bucket visible as a boundary stratum. Do not combine DELETE audit
+rows into the strict denominator unless the strict definition is explicitly
+changed.
 
 Ambiguity bounds:
 
@@ -341,6 +362,7 @@ The census strata are:
 - `put-action-cancel`
 - `get-cancel-link`
 - `patch-state-cancelled`
+- `delete-unlinked` within the DELETE audit
 
 The non-census strict strata are:
 
@@ -376,19 +398,21 @@ Use them for:
 - motivating extractor improvements;
 - selecting examples for the draft.
 
-Do not use them to replace the primary 296-cell cluster design unless the
+Do not use them to replace the primary 320-cell cluster design unless the
 protocol is revised and the estimand is changed.
 
 ## 11. Known Limitations
 
 - The protocol estimates evidence precision for the current detection frame, not
   prevalence among all HTTP APIs.
-- The async-family denominator is 631 families; the validation frame is 701
+- The async-family denominator is 631 families; the validation frame is 725
   sampled-eligible cells. Keep these denominators separate.
 - Route rows inside a cell can contain mixed operation and domain semantics; the
   all-routes companion sheet measures that mixing directly for selected cells.
-- The unlinked 24 `delete-operation-resource` cells are not part of the linked
-  DELETE promotion audit.
+- The unlinked 24 `delete-operation-resource` cells are sampled as a full-census
+  boundary stratum, but they are not part of the same-resource linked envelope.
+- The 30.7% to 44.7% linkage range is a structural bounding interval. Sampling
+  confidence intervals are computed separately after labels are available.
 - Same-pattern `source` and `openapi` rows can share a `route_id`; use
   `evidence_id` for worksheet joins.
 - Cross-pattern route duplication was rare in the raw frame and is removed by

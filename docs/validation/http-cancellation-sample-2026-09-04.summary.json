@@ -1,18 +1,25 @@
 {
+  "byDeleteOperationResourceBucket": {
+    "delete-and-strict-different-resource": 30,
+    "delete-and-strict-same-resource": 15,
+    "delete-only-linked": 55,
+    "delete-unlinked": 24
+  },
   "byEstimationPopulation": {
-    "delete-operation-resource-audit": 100,
+    "delete-operation-resource-audit": 124,
     "strict-cancellation": 196
   },
   "byLinkageBucket": {
     "domain-transition-risk": 69,
     "mixed-operation-target-and-risk": 18,
     "mixed-same-resource-and-risk": 32,
-    "operation-like-target": 21,
+    "operation-like-target": 38,
+    "other": 7,
     "same-resource-linked": 156
   },
   "byPattern": {
     "delete-action-cancel": 31,
-    "delete-operation-resource": 100,
+    "delete-operation-resource": 124,
     "get-cancel-link": 18,
     "patch-state-cancelled": 5,
     "post-action-cancel": 35,
@@ -20,13 +27,13 @@
     "put-action-cancel": 27
   },
   "bySourceKind": {
-    "openapi": 85,
-    "source": 211
+    "openapi": 86,
+    "source": 234
   },
   "bySourceKindByPattern": {
     "openapi": {
       "delete-action-cancel": 15,
-      "delete-operation-resource": 27,
+      "delete-operation-resource": 28,
       "get-cancel-link": 6,
       "patch-state-cancelled": 3,
       "post-action-cancel": 5,
@@ -35,7 +42,7 @@
     },
     "source": {
       "delete-action-cancel": 16,
-      "delete-operation-resource": 73,
+      "delete-operation-resource": 96,
       "get-cancel-link": 12,
       "patch-state-cancelled": 2,
       "post-action-cancel": 30,
@@ -45,51 +52,51 @@
   },
   "cellRouteCounts": {
     "distribution": {
-      "1": 159,
+      "1": 170,
       "10": 2,
-      "11": 1,
       "12": 1,
-      "2": 67,
-      "3": 31,
-      "4": 17,
-      "5": 5,
+      "2": 80,
+      "3": 34,
+      "4": 15,
+      "5": 6,
       "6": 7,
       "7": 2,
-      "8": 3,
+      "8": 2,
       "9": 1
     },
     "extraRouteLabelsIfClusterCensus": 315,
-    "selectedCells": 296,
-    "selectedRouteRecords": 611
+    "selectedCells": 320,
+    "selectedRouteRecords": 635
   },
   "estimationGuidance": {
     "ambiguous": "Report ambiguous-as-false-positive and ambiguous-as-true-positive bounds, plus an explicit non-ambiguous rate.",
-    "confidenceIntervals": "Use Clopper-Pearson intervals as the primary interval for sampled strata, add finite-population corrected Wilson intervals as a secondary sensitivity view where applicable, and mark full-census strata separately.",
-    "deleteOperationResource": "Report separately as an audit stratum for possible strict-rule promotion; do not mix it into strict-cancellation estimates.",
+    "confidenceIntervals": "Do not use pooled Clopper-Pearson, Wilson, or Wald intervals over route rows. Use a stratified cluster bootstrap over selected family-pattern cells, with zero cell-selection variance for full-census strata.",
+    "deleteOperationResource": "Report with the DELETE audit taxonomy by bucket, including linked and unlinked cells. Map cancellation labels into operation cancellation only after adjudication.",
     "doNotPoolRawRows": true,
     "strictCancellation": "Compute per-pattern rates and a pattern-family weighted estimate using populationFamilyMemberships. This estimates pattern-family membership precision, not unique-family prevalence over 407 families.",
     "strictFamilySensitivity": "strictFamilyApproxInclusionProbability gives a collapse-to-family sensitivity check using 1 - product(1 - patternSamplingFraction). Treat it as exploratory because bucket quotas and repository caps make the exact design probability more complex."
   },
   "populationFamilyMembershipsByPattern": {
     "delete-action-cancel": 31,
-    "delete-operation-resource": 184,
+    "delete-operation-resource": 208,
     "get-cancel-link": 18,
     "patch-state-cancelled": 5,
     "post-action-cancel": 106,
     "post-subresource-cancel": 330,
     "put-action-cancel": 27
   },
-  "sampleCount": 296,
+  "sampleCount": 320,
   "samplingUnit": "family-pattern-representative",
   "selectionProvenance": {
     "cellRouteSeedNamespace": "{seed}:cell-route:{pattern}:{family_id}",
+    "deleteOperationResourceBucketSeedNamespace": "{seed}:delete-operation-resource:{bucket}",
     "evidenceId": "sha256(route_id, commit, pattern, sourceKind, path, file, lineStart, symbol)",
     "familyPatternRepresentative": "Uniform pseudo-random route selection within each family_id x pattern cell after stable identity sorting. Automated linkage, HTTP 202 responses, source kind, and confidence are not used as preferential keys.",
     "familyQueueSeedNamespace": "{seed}:{pattern}:{bucket}",
     "frameSnapshotHash": "36035d4b0fc6d94b0342fe196b20d4ff4ac26c6fb44d607e9909d4acf4f07da5",
     "pythonVersion": "3.10.12",
     "routeId": "sha256(repository, httpMethod, normalizedPath-or-path)",
-    "samplingCodeCommit": "dfff3b1d0174fc09924e48147f10a41b53496245",
+    "samplingCodeCommit": "dc24a32c27603539079015a9aded627bc9342f36",
     "seed": 20260904
   }
 }

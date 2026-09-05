@@ -1,7 +1,13 @@
 {
+  "byDeleteOperationResourceBucket": {
+    "delete-and-strict-different-resource": 67,
+    "delete-and-strict-same-resource": 25,
+    "delete-only-linked": 99,
+    "delete-unlinked": 37
+  },
   "byPattern": {
     "delete-action-cancel": 39,
-    "delete-operation-resource": 204,
+    "delete-operation-resource": 228,
     "get-cancel-link": 33,
     "patch-state-cancelled": 8,
     "post-action-cancel": 65,
@@ -9,27 +15,26 @@
     "put-action-cancel": 47
   },
   "bySourceKind": {
-    "openapi": 178,
-    "source": 433
+    "openapi": 172,
+    "source": 463
   },
   "cellRouteCounts": {
     "distribution": {
-      "1": 159,
+      "1": 170,
       "10": 2,
-      "11": 1,
       "12": 1,
-      "2": 67,
-      "3": 31,
-      "4": 17,
-      "5": 5,
+      "2": 80,
+      "3": 34,
+      "4": 15,
+      "5": 6,
       "6": 7,
       "7": 2,
-      "8": 3,
+      "8": 2,
       "9": 1
     },
     "extraRouteLabelsOverRepresentatives": 315,
-    "selectedCells": 296,
-    "selectedRouteRecords": 611
+    "selectedCells": 320,
+    "selectedRouteRecords": 635
   },
   "estimationGuidance": {
     "blinding": "Create a separate reviewer view that hides automated linkage columns before labeling.",
@@ -37,8 +42,8 @@
     "purpose": "Use this companion sheet when manual labeling needs to observe within-cell operation/domain mixing. Aggregate route labels back to cell_sample_id before estimating pattern-family membership precision."
   },
   "estimationPopulation": "sampled-family-pattern-cell-routes",
-  "sampleCount": 611,
-  "sampledCells": 296,
+  "sampleCount": 635,
+  "sampledCells": 320,
   "samplingUnit": "family-pattern-cell-route",
   "selectionProvenance": {
     "cellSelection": "Uses the same sampled family_id x pattern cells as the pattern-family representative sheet, then includes every cancellation route record in each selected cell.",
@@ -46,7 +51,7 @@
     "frameSnapshotHash": "36035d4b0fc6d94b0342fe196b20d4ff4ac26c6fb44d607e9909d4acf4f07da5",
     "pythonVersion": "3.10.12",
     "routeId": "sha256(repository, httpMethod, normalizedPath-or-path)",
-    "samplingCodeCommit": "dfff3b1d0174fc09924e48147f10a41b53496245",
+    "samplingCodeCommit": "dc24a32c27603539079015a9aded627bc9342f36",
     "seed": 20260904
   }
 }
