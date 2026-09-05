@@ -1,0 +1,24 @@
+{
+  "deleteLabelDistribution": {
+    "ambiguous": 3,
+    "cancellation": 0,
+    "deletion-or-archival": 17
+  },
+  "labelDistribution": {
+    "ambiguous": 7,
+    "domain-state-transition": 0,
+    "operation-cancellation": 13
+  },
+  "labelerAModel": "codex-current-session; dated snapshot ID unavailable in environment",
+  "labelerAPromptHash": "cd0c951c7128ad4ca00f7ce7ebff23ef5bf8adfc03ed5e5f1aa5b32a2e1324a3",
+  "labelerAPromptVersion": "b95fe0defe18081cb30dca5e278b659e9ae5207e",
+  "labelerBModel": "",
+  "labelerBPromptHash": "",
+  "labelerBPromptVersion": "",
+  "labelingTemperature": 0,
+  "modelSnapshotConstraint": "OPENAI_API_KEY was unset and Codex CLI did not expose a usable dated model snapshot ID; Labeler A was run in the current Codex session.",
+  "pilotLabelingDateA": "2026-09-05",
+  "pilotLabelingDateB": "",
+  "pilotRowCount": 40,
+  "pilotSeed": 2026090501
+}

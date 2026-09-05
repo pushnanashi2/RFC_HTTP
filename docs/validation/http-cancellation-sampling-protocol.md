@@ -61,6 +61,13 @@ Generated validation artifacts:
 | `docs/validation/http-cancellation-family-sample-2026-09-04.csv` | 140 families | Descriptive strict-family sensitivity sample |
 | `docs/validation/http-cancellation-route-sample-2026-09-04.csv` | 377 routes | Descriptive route-frame sensitivity sample |
 
+The blinded labeling view includes two OpenAPI operation-context fields:
+`operationSummary` and `operationDescription`. In the current snapshot,
+`operationSummary` is populated for 135 of 635 labeling rows. No retained
+OpenAPI operation descriptions were available in the snapshot, so
+`operationDescription` is empty for this run; the extractor preserves
+descriptions for future collection runs.
+
 Strict cancellation cell frame:
 
 | Pattern | Population cells | Sampled cells | Cell sampling fraction | Route records in selected cells |
@@ -173,7 +180,7 @@ Sampling provenance is stored in each `.summary.json` sidecar rather than in
 every CSV row. The current cell sample summary records:
 
 - `seed`: `20260904`
-- `samplingCodeCommit`: `47f22ff966d0cd667fdddffdbf3050fece1a762e`
+- `samplingCodeCommit`: `b6b1426c63c74ebcf8b7d3e6cddbe066b09cb903`
 - `pythonVersion`: `3.10.12`
 - `frameSnapshotHash`: `36035d4b0fc6d94b0342fe196b20d4ff4ac26c6fb44d607e9909d4acf4f07da5`
 
@@ -298,6 +305,8 @@ Visible reviewer context:
 - `lineStart`
 - `symbol`
 - `responseCodes`
+- `operationSummary`
+- `operationDescription`
 - bounded response semantics evidence
 - `label_taxonomy`
 - `allowed_final_labels`
@@ -372,12 +381,17 @@ if prompts or labeler settings change afterward.
 
 Pilot selection:
 
-- select 30 to 50 route rows;
-- take roughly half from `delete-operation-resource` rows and half from
+- select 40 route rows with seed `2026090501`;
+- take 20 rows from `delete-operation-resource` rows and 20 from
   `post-subresource-cancel` rows;
 - avoid census-only strata for the pilot because they are less likely to expose
   hard boundary cases;
-- record every pilot `evidence_id` in the pilot log before labeling begins.
+- record every pilot `sample_id` in the pilot log before labeling begins;
+- write the pilot input to
+  `docs/validation/http-cancellation-pilot-2026-09-05.csv`;
+- write Labeler A output to
+  `docs/validation/http-cancellation-pilot-labels-a.csv`;
+- keep Labeler B blank until the separate B-labeling pass.
 
 Pilot decision rules:
 
@@ -391,6 +405,56 @@ Pilot decision rules:
 The pilot log location is
 `docs/validation/http-cancellation-pilot-2026-09-05.md`. If a later pilot date
 is used, create a new dated log rather than overwriting this protocol.
+
+The 2026-09-05 pilot sample IDs are excluded from final estimation if prompts or
+labeler settings change after the pilot:
+
+- `cancel-0199-route-003`
+- `cancel-0207-route-002`
+- `cancel-0215-route-001`
+- `cancel-0216-route-004`
+- `cancel-0216-route-010`
+- `cancel-0222-route-001`
+- `cancel-0239-route-001`
+- `cancel-0242-route-003`
+- `cancel-0248-route-001`
+- `cancel-0255-route-001`
+- `cancel-0261-route-003`
+- `cancel-0268-route-002`
+- `cancel-0271-route-002`
+- `cancel-0281-route-002`
+- `cancel-0288-route-003`
+- `cancel-0293-route-003`
+- `cancel-0305-route-002`
+- `cancel-0307-route-002`
+- `cancel-0312-route-001`
+- `cancel-0319-route-001`
+- `cancel-0002-route-001`
+- `cancel-0003-route-005`
+- `cancel-0003-route-006`
+- `cancel-0004-route-002`
+- `cancel-0005-route-002`
+- `cancel-0005-route-004`
+- `cancel-0005-route-006`
+- `cancel-0008-route-002`
+- `cancel-0010-route-003`
+- `cancel-0014-route-001`
+- `cancel-0023-route-001`
+- `cancel-0037-route-004`
+- `cancel-0038-route-001`
+- `cancel-0039-route-002`
+- `cancel-0041-route-003`
+- `cancel-0044-route-005`
+- `cancel-0045-route-004`
+- `cancel-0047-route-001`
+- `cancel-0062-route-001`
+- `cancel-0074-route-004`
+
+The Labeler A pilot sidecar records the model as
+`codex-current-session; dated snapshot ID unavailable in environment` because no
+API key or usable dated Codex model snapshot was available in this environment.
+This is a provenance limitation of the pilot labels, not a change to the
+sampling frame.
 
 ## 10. Estimators and Intervals
 
@@ -530,4 +594,15 @@ rfc-miner split-cancellation-labeling-view \
   --input docs/validation/http-cancellation-cell-route-sample-2026-09-04.csv \
   --labeling-output docs/validation/http-cancellation-cell-route-labeling-view-2026-09-04.csv \
   --machine-output docs/validation/http-cancellation-cell-route-machine-columns-2026-09-04.csv
+```
+
+Generate the 2026-09-05 pilot sample:
+
+```bash
+rfc-miner sample-cancellation-pilot \
+  --data-dir /mnt/cash-data/rfc-http-miner/data-5000-refined \
+  --labeling-input docs/validation/http-cancellation-cell-route-labeling-view-2026-09-04.csv \
+  --machine-input docs/validation/http-cancellation-cell-route-machine-columns-2026-09-04.csv \
+  --output docs/validation/http-cancellation-pilot-2026-09-05.csv \
+  --seed 2026090501
 ```

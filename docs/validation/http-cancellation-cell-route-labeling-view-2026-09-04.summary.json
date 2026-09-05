@@ -19,6 +19,8 @@
     "lineStart",
     "symbol",
     "responseCodes",
+    "operationSummary",
+    "operationDescription",
     "responseSemanticsEvidence",
     "label_taxonomy",
     "allowed_final_labels",

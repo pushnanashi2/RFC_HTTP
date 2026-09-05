@@ -1,0 +1,41 @@
+sample_id,label,rationale,confidence,delete_label
+cancel-0199-route-003,,"DELETE of an attachment under a task is visible as removal of a subordinate record, not stopping in-progress work.",0.88,deletion-or-archival
+cancel-0207-route-002,,The visible summary says the endpoint deletes enterprise report task details.,0.90,deletion-or-archival
+cancel-0215-route-001,,The target is a build-version resource and no visible lifecycle cancellation semantics are present.,0.75,deletion-or-archival
+cancel-0216-route-004,,The endpoint deletes a Kubernetes deployment resource; a 202 response alone does not prove cancellation of running work.,0.70,deletion-or-archival
+cancel-0216-route-010,,The endpoint deletes a Kubernetes deployment resource; no visible evidence says it cancels an ongoing operation.,0.70,deletion-or-archival
+cancel-0222-route-001,,"The row only shows DELETE /job/:id, so the visible evidence cannot separate canceling a job from deleting a job record.",0.45,ambiguous
+cancel-0239-route-001,,"The visible summary says Clear all runs, which indicates cleanup rather than stopping a specific in-progress operation.",0.85,deletion-or-archival
+cancel-0242-route-003,,The row only shows DELETE /api/tasks/:id without lifecycle or deletion semantics beyond the URL.,0.45,ambiguous
+cancel-0248-route-001,,"The target is a task-template resource, so the visible endpoint looks like deleting a reusable definition.",0.82,deletion-or-archival
+cancel-0255-route-001,,DELETE of a task under a plan appears to remove a domain subresource; no running lifecycle evidence is visible.,0.75,deletion-or-archival
+cancel-0261-route-003,,"The symbol delete_library_item describes deletion of a library item, not cancellation of ongoing work.",0.80,deletion-or-archival
+cancel-0268-route-002,,The symbol deleteClonedRun and path /runs/clone/{runId} indicate deleting a cloned run record.,0.75,deletion-or-archival
+cancel-0271-route-002,,The visible OpenAPI summary explicitly says Delete a task.,0.90,deletion-or-archival
+cancel-0281-route-002,,The visible row says DELETE /api/scheduler/job but gives no summary proving either cancellation or deletion semantics.,0.45,ambiguous
+cancel-0288-route-003,,"The endpoint deletes a deployment-target resource, which is a resource removal rather than stopping an operation.",0.85,deletion-or-archival
+cancel-0293-route-003,,The path /tasks/clear indicates bulk cleanup rather than cancellation of an ongoing operation.,0.80,deletion-or-archival
+cancel-0305-route-002,,The symbol delete_cron_job indicates deletion of a cron job definition or record.,0.85,deletion-or-archival
+cancel-0307-route-002,,"The path is an SQL DELETE FROM task_logs statement, which is deletion of stored records.",0.95,deletion-or-archival
+cancel-0312-route-001,,"The symbol delete_workspace_app indicates deleting an app resource, not stopping in-progress work.",0.90,deletion-or-archival
+cancel-0319-route-001,,"The path and symbol both use remove_task, indicating removal rather than cancellation semantics.",0.85,deletion-or-archival
+cancel-0002-route-001,operation-cancellation,"The route aborts an active request, which is visible as an in-progress server-side unit of work.",0.65,
+cancel-0003-route-005,ambiguous,"The row only shows /flows/{id}/cancel and a generic cancel symbol, without lifecycle evidence.",0.50,
+cancel-0003-route-006,ambiguous,"The row only shows /flows/{id}/terminate and a generic terminate symbol, without visible lifecycle evidence.",0.50,
+cancel-0004-route-002,operation-cancellation,The symbol CancelJobSet indicates stopping a job set rather than a business-object state change.,0.72,
+cancel-0005-route-002,operation-cancellation,The symbol ThreadsController_cancelThreadRun names cancellation of a thread run operation.,0.90,
+cancel-0005-route-004,operation-cancellation,"The path and symbol target cancelMemoryDreamRun, a run-like operation rather than a domain object.",0.80,
+cancel-0005-route-006,operation-cancellation,The visible summary says Cancel Run for a runs/{run_id} route.,0.90,
+cancel-0008-route-002,ambiguous,The row shows product-publish tasks cancel but no visible lifecycle or business-object context to disambiguate.,0.55,
+cancel-0010-route-003,operation-cancellation,The symbol stop_task and stop action point to stopping a task-like unit of work.,0.70,
+cancel-0014-route-001,ambiguous,"The row only shows cancel_agent, and an agent may be either a resource or a running process.",0.45,
+cancel-0023-route-001,operation-cancellation,The symbol stop_pipeline indicates stopping a pipeline execution-like process.,0.80,
+cancel-0037-route-004,operation-cancellation,"The route includes setupRunId and cancel, indicating cancellation of a setup run.",0.80,
+cancel-0038-route-001,operation-cancellation,"The visible summary says Abort bulk action, which is an action in progress.",0.85,
+cancel-0039-route-002,operation-cancellation,The symbol stopRun identifies stopping a run operation.,0.85,
+cancel-0041-route-003,operation-cancellation,The visible summary says Stop pipeline execution.,0.95,
+cancel-0044-route-005,ambiguous,The row only shows /stop without a target name or lifecycle context.,0.40,
+cancel-0045-route-004,ambiguous,The row only shows /api/stop without visible target or lifecycle context.,0.40,
+cancel-0047-route-001,operation-cancellation,The symbol stop_execution indicates stopping an execution process.,0.85,
+cancel-0062-route-001,operation-cancellation,The symbol stop_recording indicates stopping an ongoing recording process.,0.75,
+cancel-0074-route-004,ambiguous,The route is a generic stop endpoint and the visible symbol savedScheduleConfig does not prove a running operation.,0.45,
