@@ -693,6 +693,7 @@ class PipelineTests(unittest.TestCase):
             )
             self.assertTrue(labeling_summary["workflow"]["unanchoredSubsetRemoved"])
             self.assertEqual(labeling_summary["labelingProvenance"]["labelingTemperature"], 0)
+            self.assertIn("DELETE taxonomy label", labeling_summary["workflow"]["agreementDefinition"])
 
     def test_labeling_prompts_are_blind_to_detection_patterns(self) -> None:
         forbidden_patterns = {

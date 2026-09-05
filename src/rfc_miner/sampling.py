@@ -1743,6 +1743,11 @@ def labeling_view_summary(
         "workflow": {
             "labelers": "Two independent LLM labelers produce A/B labels from the blinded labeling view.",
             "adjudication": "Rows where A and B disagree are adjudicated by one human author.",
+            "agreementDefinition": (
+                "Set agreement=true only when labelerA_label and labelerB_label are identical "
+                "within the row's label_taxonomy. DELETE audit rows require exact agreement on "
+                "the DELETE taxonomy label, not just agreement on a broader operation/domain category."
+            ),
             "unanchoredSubsetRemoved": True,
             "labelingTemperature": 0,
         },
