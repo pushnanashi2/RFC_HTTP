@@ -120,8 +120,6 @@ def build_parser() -> argparse.ArgumentParser:
     split_labeling_view.add_argument("--input", required=True)
     split_labeling_view.add_argument("--labeling-output", required=True)
     split_labeling_view.add_argument("--machine-output", required=True)
-    split_labeling_view.add_argument("--seed", type=int, default=20260904)
-    split_labeling_view.add_argument("--unanchored-size", type=int, default=80)
 
     run = subcommands.add_parser("run", help="run the full pipeline")
     add_common(run)
@@ -268,8 +266,6 @@ def main(argv: list[str] | None = None) -> int:
             input_path=args.input,
             labeling_output_path=args.labeling_output,
             machine_output_path=args.machine_output,
-            seed=args.seed,
-            unanchored_size=args.unanchored_size,
         )
         print(
             "cancellation labeling view: "

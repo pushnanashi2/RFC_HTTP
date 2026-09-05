@@ -20,6 +20,8 @@ from .operation_linkage import (
 from .paths import DataPaths, ensure_data_dirs
 
 
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
+
 FULL_SAMPLE_SIZES = {
     "post-subresource-cancel": 80,
     "post-action-cancel": 35,
@@ -85,6 +87,21 @@ DELETE_OPERATION_RESOURCE_BUCKET_ORDER = (
     "delete-and-strict-same-resource",
     "delete-unlinked",
 )
+
+# These legacy workflow fields are deprecated for labeling. Keep them in
+# non-blind sample artifacts with their historical names rather than prefixing or
+# deleting them because the validation task requires representative, companion,
+# and machine-column CSV schemas to remain stable. The blind labeling view hides
+# them and uses the independent A/B labeler fields below instead.
+LEGACY_REVIEW_WORKFLOW_COLUMNS = [
+    "primaryLabel",
+    "secondaryFlags",
+    "reviewerConfidence",
+    "rationale",
+    "reviewer",
+    "adjudicatedLabel",
+]
+
 FULL_DELETE_OPERATION_RESOURCE_BUCKET_SIZES = {
     "delete-only-linked": 55,
     "delete-and-strict-different-resource": 30,
@@ -134,15 +151,11 @@ SAMPLE_COLUMNS = [
     "routeLevelOperationLinked",
     "operationTarget",
     "domainTransitionRisk",
-    "primaryLabel",
-    "secondaryFlags",
-    "reviewerConfidence",
-    "rationale",
+    *LEGACY_REVIEW_WORKFLOW_COLUMNS[:4],
     "adjacentOperationEvidence",
     "terminalStateEvidence",
     "responseSemanticsEvidence",
-    "reviewer",
-    "adjudicatedLabel",
+    *LEGACY_REVIEW_WORKFLOW_COLUMNS[4:],
 ]
 
 FAMILY_SAMPLE_COLUMNS = [
@@ -179,15 +192,11 @@ FAMILY_SAMPLE_COLUMNS = [
     "routeLevelOperationLinked",
     "operationTarget",
     "domainTransitionRisk",
-    "primaryLabel",
-    "secondaryFlags",
-    "reviewerConfidence",
-    "rationale",
+    *LEGACY_REVIEW_WORKFLOW_COLUMNS[:4],
     "adjacentOperationEvidence",
     "terminalStateEvidence",
     "responseSemanticsEvidence",
-    "reviewer",
-    "adjudicatedLabel",
+    *LEGACY_REVIEW_WORKFLOW_COLUMNS[4:],
 ]
 
 ROUTE_SAMPLE_COLUMNS = [
@@ -222,12 +231,7 @@ ROUTE_SAMPLE_COLUMNS = [
     "adjacentOperationEvidence",
     "terminalStateEvidence",
     "responseSemanticsEvidence",
-    "primaryLabel",
-    "secondaryFlags",
-    "reviewerConfidence",
-    "rationale",
-    "reviewer",
-    "adjudicatedLabel",
+    *LEGACY_REVIEW_WORKFLOW_COLUMNS,
 ]
 
 CELL_ROUTE_SAMPLE_COLUMNS = [
@@ -269,15 +273,11 @@ CELL_ROUTE_SAMPLE_COLUMNS = [
     "routeLevelOperationLinked",
     "operationTarget",
     "domainTransitionRisk",
-    "primaryLabel",
-    "secondaryFlags",
-    "reviewerConfidence",
-    "rationale",
+    *LEGACY_REVIEW_WORKFLOW_COLUMNS[:4],
     "adjacentOperationEvidence",
     "terminalStateEvidence",
     "responseSemanticsEvidence",
-    "reviewer",
-    "adjudicatedLabel",
+    *LEGACY_REVIEW_WORKFLOW_COLUMNS[4:],
 ]
 
 LABELING_ID_COLUMNS = [
@@ -303,23 +303,18 @@ LABELING_CONTEXT_COLUMNS = [
 ]
 
 LABELING_WORKFLOW_COLUMNS = [
-    "unanchored_subset",
-    "draft_visible_to_human",
     "label_taxonomy",
     "allowed_final_labels",
-    "draft_label",
-    "draft_quote",
-    "draft_rationale",
-    "labeler_a_label",
-    "labeler_a_quote",
-    "labeler_a_rationale",
-    "labeler_b_label",
-    "labeler_b_quote",
-    "labeler_b_rationale",
+    "labelerA_label",
+    "labelerA_rationale",
+    "labelerA_confidence",
+    "labelerB_label",
+    "labelerB_rationale",
+    "labelerB_confidence",
+    "agreement",
     "final_label",
-    "adjudicator",
-    "changed_from_draft",
-    "note",
+    "adjudicated",
+    "adjudicator_rationale",
 ]
 
 BLIND_LABELING_HIDDEN_COLUMNS = {
@@ -360,12 +355,7 @@ BLIND_LABELING_HIDDEN_COLUMNS = {
     "domainTransitionRisk",
     "adjacentOperationEvidence",
     "terminalStateEvidence",
-    "primaryLabel",
-    "secondaryFlags",
-    "reviewerConfidence",
-    "rationale",
-    "reviewer",
-    "adjudicatedLabel",
+    *LEGACY_REVIEW_WORKFLOW_COLUMNS,
 }
 
 
@@ -494,23 +484,12 @@ def write_blind_labeling_views(
     input_path: str | Path,
     labeling_output_path: str | Path,
     machine_output_path: str | Path,
-    seed: int = 20260904,
-    unanchored_size: int = 80,
 ) -> tuple[Path, Path, int]:
     source = Path(input_path)
     with source.open("r", encoding="utf-8", newline="") as handle:
         reader = csv.DictReader(handle)
         rows = list(reader)
         fieldnames = list(reader.fieldnames or [])
-
-    unanchored_unit_column = "cell_sample_id" if any(row.get("cell_sample_id") for row in rows) else "sample_id"
-    unanchored_ids = select_unanchored_unit_ids(
-        rows=rows,
-        unit_column=unanchored_unit_column,
-        seed=seed,
-        source_name=source.name,
-        target_size=unanchored_size,
-    )
 
     labeling_columns = [
         column
@@ -527,28 +506,21 @@ def write_blind_labeling_views(
     labeling_rows: list[dict[str, str]] = []
     machine_rows: list[dict[str, str]] = []
     for row in rows:
-        sample_id = row.get("sample_id", "")
-        unanchored_unit_id = row.get(unanchored_unit_column, sample_id)
         labeling_row = {column: row.get(column, "") for column in labeling_columns}
         labeling_row.update(
             {
-                "unanchored_subset": str(unanchored_unit_id in unanchored_ids).lower(),
-                "draft_visible_to_human": str(unanchored_unit_id not in unanchored_ids).lower(),
                 "label_taxonomy": label_taxonomy(row),
                 "allowed_final_labels": allowed_final_labels(row),
-                "draft_label": "",
-                "draft_quote": "",
-                "draft_rationale": "",
-                "labeler_a_label": "",
-                "labeler_a_quote": "",
-                "labeler_a_rationale": "",
-                "labeler_b_label": "",
-                "labeler_b_quote": "",
-                "labeler_b_rationale": "",
+                "labelerA_label": "",
+                "labelerA_rationale": "",
+                "labelerA_confidence": "",
+                "labelerB_label": "",
+                "labelerB_rationale": "",
+                "labelerB_confidence": "",
+                "agreement": "",
                 "final_label": "",
-                "adjudicator": "",
-                "changed_from_draft": "",
-                "note": "",
+                "adjudicated": "",
+                "adjudicator_rationale": "",
             }
         )
         labeling_rows.append(labeling_row)
@@ -558,102 +530,15 @@ def write_blind_labeling_views(
     machine_target = Path(machine_output_path)
     write_csv(labeling_target, labeling_rows, columns=labeling_columns)
     write_csv(machine_target, machine_rows, columns=machine_columns)
-    return labeling_target, machine_target, len(rows)
-
-
-def select_unanchored_unit_ids(
-    *,
-    rows: list[dict[str, str]],
-    unit_column: str,
-    seed: int,
-    source_name: str,
-    target_size: int,
-) -> set[str]:
-    unit_representatives: dict[str, dict[str, str]] = {}
-    for row in rows:
-        unit_id = row.get(unit_column, "")
-        if unit_id and unit_id not in unit_representatives:
-            unit_representatives[unit_id] = row
-
-    target_count = min(target_size, len(unit_representatives))
-    if target_count <= 0:
-        return set()
-
-    units_by_stratum: dict[str, list[str]] = defaultdict(list)
-    for unit_id, row in unit_representatives.items():
-        units_by_stratum[unanchored_sampling_stratum(row)].append(unit_id)
-
-    quotas = proportional_minimum_one_quotas(
-        {stratum: len(unit_ids) for stratum, unit_ids in units_by_stratum.items()},
-        target_count,
+    write_json(
+        labeling_target.with_suffix(".summary.json"),
+        labeling_view_summary(
+            rows=rows,
+            labeling_columns=labeling_columns,
+            machine_columns=machine_columns,
+        ),
     )
-    selected: set[str] = set()
-    for stratum, unit_ids in sorted(units_by_stratum.items()):
-        candidates = sorted(unit_ids)
-        rng = random.Random(f"{seed}:unanchored-subset:{source_name}:{stratum}")
-        rng.shuffle(candidates)
-        selected.update(candidates[: quotas.get(stratum, 0)])
-    return selected
-
-
-def unanchored_sampling_stratum(row: dict[str, str]) -> str:
-    pattern = row.get("pattern") or "unknown"
-    if pattern == "delete-operation-resource":
-        bucket = row.get("deleteOperationResourceBucket") or "unknown"
-        return f"{pattern}:{bucket}"
-    return pattern
-
-
-def proportional_minimum_one_quotas(
-    population_counts: dict[str, int],
-    target_size: int,
-) -> dict[str, int]:
-    strata = sorted(stratum for stratum, count in population_counts.items() if count > 0)
-    population_total = sum(population_counts[stratum] for stratum in strata)
-    target_count = min(target_size, population_total)
-    quotas = {stratum: 0 for stratum in strata}
-    if target_count <= 0:
-        return quotas
-
-    if target_count >= len(strata):
-        quotas = {stratum: 1 for stratum in strata}
-        remaining = target_count - len(strata)
-        capacities = {
-            stratum: population_counts[stratum] - 1
-            for stratum in strata
-        }
-    else:
-        remaining = target_count
-        capacities = {stratum: population_counts[stratum] for stratum in strata}
-
-    capacity_total = sum(capacities.values())
-    if remaining <= 0 or capacity_total <= 0:
-        return quotas
-
-    remainders: list[tuple[float, str]] = []
-    assigned = 0
-    for stratum in strata:
-        exact = remaining * capacities[stratum] / capacity_total
-        floor = min(capacities[stratum], int(exact))
-        quotas[stratum] += floor
-        assigned += floor
-        remainders.append((exact - floor, stratum))
-
-    slots = remaining - assigned
-    while slots > 0:
-        progressed = False
-        for _, stratum in sorted(remainders, key=lambda item: (-item[0], item[1])):
-            if quotas[stratum] >= population_counts[stratum]:
-                continue
-            quotas[stratum] += 1
-            slots -= 1
-            progressed = True
-            if slots == 0:
-                break
-        if not progressed:
-            break
-
-    return quotas
+    return labeling_target, machine_target, len(rows)
 
 
 def label_taxonomy(row: dict[str, str]) -> str:
@@ -1665,6 +1550,7 @@ def sample_summary(rows: list[dict[str, str]], *, seed: int, paths: DataPaths) -
             "routeId": "sha256(repository, httpMethod, normalizedPath-or-path)",
             "evidenceId": "sha256(route_id, commit, pattern, sourceKind, path, file, lineStart, symbol)",
         },
+        "labelingProvenance": labeling_provenance(),
         "estimationGuidance": {
             "doNotPoolRawRows": True,
             "strictCancellation": (
@@ -1721,6 +1607,7 @@ def family_sample_summary(rows: list[dict[str, str]], *, seed: int, paths: DataP
             "routeId": "sha256(repository, httpMethod, normalizedPath-or-path)",
             "evidenceId": "sha256(route_id, commit, pattern, sourceKind, path, file, lineStart, symbol)",
         },
+        "labelingProvenance": labeling_provenance(),
         "estimationGuidance": {
             "purpose": (
                 "Use this sheet, not the pattern-family sheet, when updating unique-family "
@@ -1766,6 +1653,7 @@ def route_sample_summary(rows: list[dict[str, str]], *, seed: int, paths: DataPa
             "routeId": "sha256(repository, httpMethod, normalizedPath-or-path)",
             "evidenceId": "sha256(route_id, commit, pattern, sourceKind, path, file, lineStart, symbol)",
         },
+        "labelingProvenance": labeling_provenance(),
         "estimationGuidance": {
             "purpose": (
                 "Use this sheet for route-record operation-vs-domain cancellation precision. "
@@ -1824,6 +1712,7 @@ def cell_route_sample_summary(rows: list[dict[str, str]], *, seed: int, paths: D
             "routeId": "sha256(repository, httpMethod, normalizedPath-or-path)",
             "evidenceId": "sha256(route_id, commit, pattern, sourceKind, path, file, lineStart, symbol)",
         },
+        "labelingProvenance": labeling_provenance(),
         "estimationGuidance": {
             "purpose": (
                 "Use this companion sheet when manual labeling needs to observe within-cell "
@@ -1838,6 +1727,28 @@ def cell_route_sample_summary(rows: list[dict[str, str]], *, seed: int, paths: D
     }
 
 
+def labeling_view_summary(
+    *,
+    rows: list[dict[str, str]],
+    labeling_columns: list[str],
+    machine_columns: list[str],
+) -> dict[str, Any]:
+    by_taxonomy = Counter(label_taxonomy(row) for row in rows)
+    return {
+        "sampleCount": len(rows),
+        "labelingColumns": labeling_columns,
+        "machineColumns": machine_columns,
+        "byLabelTaxonomy": dict(sorted(by_taxonomy.items())),
+        "labelingProvenance": labeling_provenance(),
+        "workflow": {
+            "labelers": "Two independent LLM labelers produce A/B labels from the blinded labeling view.",
+            "adjudication": "Rows where A and B disagree are adjudicated by one human author.",
+            "unanchoredSubsetRemoved": True,
+            "labelingTemperature": 0,
+        },
+    }
+
+
 def sampling_provenance(*, paths: DataPaths, seed: int) -> dict[str, str | int]:
     return {
         "seed": seed,
@@ -1845,6 +1756,28 @@ def sampling_provenance(*, paths: DataPaths, seed: int) -> dict[str, str | int]:
         "pythonVersion": sys.version.split()[0],
         "frameSnapshotHash": frame_snapshot_hash(paths),
     }
+
+
+def labeling_provenance() -> dict[str, str | int]:
+    return {
+        "labelerAModel": "",
+        "labelerAPromptHash": prompt_file_hash("prompts/label-a.md"),
+        "labelerBModel": "",
+        "labelerBPromptHash": prompt_file_hash("prompts/label-b.md"),
+        "labelingRunDate": "",
+        "labelingTemperature": 0,
+    }
+
+
+def prompt_file_hash(relative_path: str) -> str:
+    path = PROJECT_ROOT / relative_path
+    if not path.exists():
+        return ""
+    digest = hashlib.sha256()
+    with path.open("rb") as handle:
+        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
 
 
 def sampling_code_commit() -> str:
