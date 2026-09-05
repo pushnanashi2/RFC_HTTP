@@ -65,6 +65,8 @@ MINIMUM_ROUTE_SAMPLE_SIZES: dict[str, int | None] = {
 PATTERN_ORDER = tuple(FULL_SAMPLE_SIZES)
 ROUTE_STRATUM_ORDER = tuple(FULL_ROUTE_SAMPLE_SIZES)
 STRICT_PATTERN_ORDER = tuple(pattern for pattern in PATTERN_ORDER if pattern != "delete-operation-resource")
+PRIMARY_PATTERN_ORDER = STRICT_PATTERN_ORDER + ("delete-operation-resource",)
+PRIMARY_PATTERN_RANK = {pattern: rank for rank, pattern in enumerate(PRIMARY_PATTERN_ORDER)}
 STRICT_FAMILY_SAMPLE_SIZES = {
     "full": 140,
     "minimum": 80,
@@ -77,6 +79,22 @@ BUCKET_ORDER = (
     "domain-transition-risk",
     "other",
 )
+DELETE_OPERATION_RESOURCE_BUCKET_ORDER = (
+    "delete-only-linked",
+    "delete-and-strict-different-resource",
+    "delete-and-strict-same-resource",
+    "delete-unlinked",
+)
+FULL_DELETE_OPERATION_RESOURCE_BUCKET_SIZES = {
+    "delete-only-linked": 70,
+    "delete-and-strict-different-resource": 15,
+    "delete-and-strict-same-resource": 15,
+}
+MINIMUM_DELETE_OPERATION_RESOURCE_BUCKET_SIZES = {
+    "delete-only-linked": 7,
+    "delete-and-strict-different-resource": 2,
+    "delete-and-strict-same-resource": 1,
+}
 
 SAMPLE_COLUMNS = [
     "sample_id",
@@ -89,6 +107,7 @@ SAMPLE_COLUMNS = [
     "pattern",
     "cellRouteCount",
     "linkageBucket",
+    "deleteOperationResourceBucket",
     "populationFamilyMemberships",
     "patternSampleSize",
     "patternSamplingFraction",
@@ -135,6 +154,7 @@ FAMILY_SAMPLE_COLUMNS = [
     "repository",
     "pattern",
     "linkageBucket",
+    "deleteOperationResourceBucket",
     "populationStrictFamilies",
     "strictFamilySampleSize",
     "strictFamilySamplingFraction",
@@ -183,6 +203,7 @@ ROUTE_SAMPLE_COLUMNS = [
     "family_id",
     "repository",
     "pattern",
+    "deleteOperationResourceBucket",
     "httpMethod",
     "normalizedPath",
     "path",
@@ -221,6 +242,7 @@ CELL_ROUTE_SAMPLE_COLUMNS = [
     "pattern",
     "cellRouteCount",
     "linkageBucket",
+    "deleteOperationResourceBucket",
     "populationFamilyMemberships",
     "patternSampleSize",
     "patternSamplingFraction",
@@ -282,6 +304,8 @@ LABELING_CONTEXT_COLUMNS = [
 LABELING_WORKFLOW_COLUMNS = [
     "unanchored_subset",
     "draft_visible_to_human",
+    "label_taxonomy",
+    "allowed_final_labels",
     "draft_label",
     "draft_quote",
     "draft_rationale",
@@ -303,6 +327,7 @@ BLIND_LABELING_HIDDEN_COLUMNS = {
     "pattern",
     "routeStratum",
     "linkageBucket",
+    "deleteOperationResourceBucket",
     "cellRouteCount",
     "populationFamilyMemberships",
     "patternSampleSize",
@@ -477,7 +502,8 @@ def write_blind_labeling_views(
         rows = list(reader)
         fieldnames = list(reader.fieldnames or [])
 
-    label_ids = sorted(row["sample_id"] for row in rows if row.get("sample_id"))
+    unanchored_unit_column = "cell_sample_id" if any(row.get("cell_sample_id") for row in rows) else "sample_id"
+    label_ids = sorted({row[unanchored_unit_column] for row in rows if row.get(unanchored_unit_column)})
     rng = random.Random(f"{seed}:unanchored-subset:{source.name}")
     rng.shuffle(label_ids)
     unanchored_ids = set(label_ids[: min(unanchored_size, len(label_ids))])
@@ -498,11 +524,14 @@ def write_blind_labeling_views(
     machine_rows: list[dict[str, str]] = []
     for row in rows:
         sample_id = row.get("sample_id", "")
+        unanchored_unit_id = row.get(unanchored_unit_column, sample_id)
         labeling_row = {column: row.get(column, "") for column in labeling_columns}
         labeling_row.update(
             {
-                "unanchored_subset": str(sample_id in unanchored_ids).lower(),
-                "draft_visible_to_human": str(sample_id not in unanchored_ids).lower(),
+                "unanchored_subset": str(unanchored_unit_id in unanchored_ids).lower(),
+                "draft_visible_to_human": str(unanchored_unit_id not in unanchored_ids).lower(),
+                "label_taxonomy": label_taxonomy(row),
+                "allowed_final_labels": allowed_final_labels(row),
                 "draft_label": "",
                 "draft_quote": "",
                 "draft_rationale": "",
@@ -526,6 +555,18 @@ def write_blind_labeling_views(
     write_csv(labeling_target, labeling_rows, columns=labeling_columns)
     write_csv(machine_target, machine_rows, columns=machine_columns)
     return labeling_target, machine_target, len(rows)
+
+
+def label_taxonomy(row: dict[str, str]) -> str:
+    if row.get("pattern") == "delete-operation-resource":
+        return "delete-operation-resource"
+    return "operation-vs-domain"
+
+
+def allowed_final_labels(row: dict[str, str]) -> str:
+    if label_taxonomy(row) == "delete-operation-resource":
+        return "cancellation;deletion-or-archival;ambiguous"
+    return "operation-cancellation;domain-state-transition;ambiguous"
 
 
 def build_cancellation_sample_records(
@@ -638,16 +679,14 @@ def cancellation_rows_by_pattern_family(
     )
     rows_by_pattern_family: dict[str, dict[str, list[dict[str, str]]]] = defaultdict(lambda: defaultdict(list))
 
-    for record in evidence:
-        if str(record.get("concept") or "") != "http-cancellation":
-            continue
+    for record in primary_cancellation_records(
+        evidence=evidence,
+        family_by_repo=family_by_repo,
+        patterns=patterns,
+    ):
         pattern = str(record.get("pattern") or "")
-        if pattern not in patterns:
-            continue
         repo_id = str(record.get("repository") or "")
         family_id = included_family_id(repo_id, family_by_repo)
-        if family_id is None:
-            continue
         linkage = cancellation_record_linkage(
             record=record,
             async_paths_by_repo=async_paths_by_repo,
@@ -660,7 +699,37 @@ def cancellation_rows_by_pattern_family(
         )
         rows_by_pattern_family[pattern][family_id].append(row)
 
+    annotate_delete_operation_resource_buckets(rows_by_pattern_family)
     return rows_by_pattern_family, strict_pattern_memberships_by_family(rows_by_pattern_family)
+
+
+def primary_cancellation_records(
+    *,
+    evidence: list[dict[str, Any]],
+    family_by_repo: dict[str, dict[str, Any]],
+    patterns: set[str],
+) -> list[dict[str, Any]]:
+    candidates: list[dict[str, Any]] = []
+    best_pattern_by_route: dict[str, str] = {}
+    for record in evidence:
+        if str(record.get("concept") or "") != "http-cancellation":
+            continue
+        pattern = str(record.get("pattern") or "")
+        if pattern not in patterns:
+            continue
+        repo_id = str(record.get("repository") or "")
+        if included_family_id(repo_id, family_by_repo) is None:
+            continue
+        candidates.append(record)
+        route_id = stable_route_id(record)
+        current = best_pattern_by_route.get(route_id)
+        if current is None or pattern_rank(pattern) < pattern_rank(current):
+            best_pattern_by_route[route_id] = pattern
+    return [
+        record
+        for record in candidates
+        if str(record.get("pattern") or "") == best_pattern_by_route[stable_route_id(record)]
+    ]
 
 
 def select_family_pattern_sample(
@@ -712,15 +781,16 @@ def build_cancellation_route_sample_records(
         family_by_repo=family_by_repo,
     )
     rows_by_stratum: dict[str, list[dict[str, str]]] = defaultdict(list)
+    route_patterns = {stratum.split(":", 1)[0] for stratum in sample_sizes}
 
-    for record in evidence:
-        if str(record.get("concept") or "") != "http-cancellation":
-            continue
+    for record in primary_cancellation_records(
+        evidence=evidence,
+        family_by_repo=family_by_repo,
+        patterns=route_patterns,
+    ):
         pattern = str(record.get("pattern") or "")
         repo_id = str(record.get("repository") or "")
         family_id = included_family_id(repo_id, family_by_repo)
-        if family_id is None:
-            continue
         linkage = cancellation_record_linkage(
             record=record,
             async_paths_by_repo=async_paths_by_repo,
@@ -781,15 +851,13 @@ def build_cancellation_family_sample_records(
     )
     rows_by_family: dict[str, list[dict[str, str]]] = defaultdict(list)
 
-    for record in evidence:
-        if str(record.get("concept") or "") != "http-cancellation":
-            continue
-        if str(record.get("pattern") or "") not in STRICT_PATTERN_ORDER:
-            continue
+    for record in primary_cancellation_records(
+        evidence=evidence,
+        family_by_repo=family_by_repo,
+        patterns=set(STRICT_PATTERN_ORDER),
+    ):
         repo_id = str(record.get("repository") or "")
         family_id = included_family_id(repo_id, family_by_repo)
-        if family_id is None:
-            continue
         linkage = cancellation_record_linkage(
             record=record,
             async_paths_by_repo=async_paths_by_repo,
@@ -862,6 +930,33 @@ def async_evidence_index(
     return index
 
 
+def annotate_delete_operation_resource_buckets(
+    rows_by_pattern_family: dict[str, dict[str, list[dict[str, str]]]],
+) -> None:
+    strict_linked_families: set[str] = set()
+    strict_linked_resources: set[tuple[str, str]] = set()
+    for pattern in STRICT_PATTERN_ORDER:
+        for family_id, rows in rows_by_pattern_family.get(pattern, {}).items():
+            for row in rows:
+                if row["routeLevelOperationLinked"] != "true":
+                    continue
+                strict_linked_families.add(family_id)
+                strict_linked_resources.add((family_id, row["cancelTargetPath"]))
+
+    for family_id, rows in rows_by_pattern_family.get("delete-operation-resource", {}).items():
+        linked_rows = [row for row in rows if row["routeLevelOperationLinked"] == "true"]
+        if not linked_rows:
+            bucket = "delete-unlinked"
+        elif family_id not in strict_linked_families:
+            bucket = "delete-only-linked"
+        elif any((family_id, row["cancelTargetPath"]) in strict_linked_resources for row in linked_rows):
+            bucket = "delete-and-strict-same-resource"
+        else:
+            bucket = "delete-and-strict-different-resource"
+        for row in rows:
+            row["deleteOperationResourceBucket"] = bucket
+
+
 def group_family_pattern_representatives(
     rows_by_pattern_family: dict[str, dict[str, list[dict[str, str]]]],
     *,
@@ -891,8 +986,14 @@ def group_family_pattern_representatives(
             representative["familyPatternHasOperationTarget"] = str(has_operation_target).lower()
             representative["familyPatternHasDomainTransitionRisk"] = str(has_domain_risk).lower()
             representative["familyPatternCancellationEvidence"] = format_sample_row_evidence(rows)
-            grouped[pattern][representative["linkageBucket"]][family_id].append(representative)
+            grouped[pattern][sampling_bucket(representative)][family_id].append(representative)
     return grouped
+
+
+def sampling_bucket(row: dict[str, str]) -> str:
+    if row["pattern"] == "delete-operation-resource":
+        return row["deleteOperationResourceBucket"] or row["linkageBucket"]
+    return row["linkageBucket"]
 
 
 def strict_pattern_memberships_by_family(
@@ -976,6 +1077,16 @@ def select_pattern_rows(
     repository_pattern_counts: Counter[tuple[str, str]],
     repository_total_counts: Counter[str],
 ) -> list[dict[str, str]]:
+    delete_bucket_targets = delete_operation_resource_bucket_sample_sizes(target_size)
+    if pattern == "delete-operation-resource" and delete_bucket_targets is not None:
+        return select_delete_operation_resource_rows(
+            bucketed_families=bucketed_families,
+            bucket_targets=delete_bucket_targets,
+            seed=seed,
+            repository_pattern_counts=repository_pattern_counts,
+            repository_total_counts=repository_total_counts,
+        )
+
     selected: list[dict[str, str]] = []
     queues = shuffled_family_queues(
         pattern=pattern,
@@ -1019,6 +1130,48 @@ def select_pattern_rows(
             break
 
     return selected
+
+
+def select_delete_operation_resource_rows(
+    *,
+    bucketed_families: dict[str, dict[str, list[dict[str, str]]]],
+    bucket_targets: dict[str, int],
+    seed: int,
+    repository_pattern_counts: Counter[tuple[str, str]],
+    repository_total_counts: Counter[str],
+) -> list[dict[str, str]]:
+    selected: list[dict[str, str]] = []
+    population_family_memberships = sum(
+        len(bucketed_families.get(bucket, {}))
+        for bucket in bucket_targets
+    )
+    for bucket in DELETE_OPERATION_RESOURCE_BUCKET_ORDER:
+        target_size = bucket_targets.get(bucket, 0)
+        if target_size <= 0:
+            continue
+        family_ids = sorted(bucketed_families.get(bucket, {}))
+        rng = random.Random(f"{seed}:delete-operation-resource:{bucket}")
+        rng.shuffle(family_ids)
+        queue = [sorted(bucketed_families[bucket][family_id], key=row_quality_key) for family_id in family_ids]
+        selected.extend(
+            drain_bucket(
+                pattern="delete-operation-resource",
+                queue=queue,
+                target_size=target_size,
+                population_family_memberships=population_family_memberships,
+                repository_pattern_counts=repository_pattern_counts,
+                repository_total_counts=repository_total_counts,
+            )
+        )
+    return selected
+
+
+def delete_operation_resource_bucket_sample_sizes(target_size: int) -> dict[str, int] | None:
+    if target_size == FULL_SAMPLE_SIZES["delete-operation-resource"]:
+        return dict(FULL_DELETE_OPERATION_RESOURCE_BUCKET_SIZES)
+    if target_size == MINIMUM_SAMPLE_SIZES["delete-operation-resource"]:
+        return dict(MINIMUM_DELETE_OPERATION_RESOURCE_BUCKET_SIZES)
+    return None
 
 
 def shuffled_family_queues(
@@ -1138,6 +1291,7 @@ def sample_row(
         "pattern": str(record.get("pattern") or ""),
         "cellRouteCount": "",
         "linkageBucket": str(linkage.get("linkageBucket") or ""),
+        "deleteOperationResourceBucket": "",
         "populationFamilyMemberships": "",
         "patternSampleSize": "",
         "patternSamplingFraction": "",
@@ -1224,6 +1378,10 @@ def route_sample_stratum(*, pattern: str, linkage: dict[str, Any]) -> str:
         suffix = "linked" if linkage.get("routeLevelOperationLinked") else "unlinked"
         return f"{pattern}:{suffix}"
     return f"{pattern}:any"
+
+
+def pattern_rank(pattern: str) -> int:
+    return PRIMARY_PATTERN_RANK.get(pattern, len(PRIMARY_PATTERN_RANK))
 
 
 def select_cell_representative(

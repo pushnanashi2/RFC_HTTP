@@ -660,7 +660,12 @@ class PipelineTests(unittest.TestCase):
             self.assertIn("routeLevelOperationLinked", machine_fields)
             self.assertIn("evidence_id", labeling_fields)
             self.assertIn("evidence_id", machine_fields)
-            self.assertEqual(Counter(row["unanchored_subset"] for row in labeling_rows)["true"], 1)
+            unanchored_cell_ids = {
+                row["cell_sample_id"]
+                for row in labeling_rows
+                if row["unanchored_subset"] == "true"
+            }
+            self.assertEqual(len(unanchored_cell_ids), 1)
 
     def test_cancellation_representative_route_is_seeded_not_outcome_sorted(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
@@ -782,6 +787,77 @@ class PipelineTests(unittest.TestCase):
             stable_evidence_id(base_record, route_id=stable_route_id(base_record)),
             stable_evidence_id(changed_source, route_id=stable_route_id(changed_source)),
         )
+
+    def test_primary_pattern_removes_cross_pattern_route_duplicates(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            paths = data_paths(temporary)
+            write_jsonl(
+                paths.repositories,
+                [{"repo_id": "example/ops", "repository_url": "https://github.com/example/ops"}],
+            )
+            write_jsonl(
+                paths.raw_evidence,
+                [
+                    {
+                        "repository": "example/ops",
+                        "commit": "abc123",
+                        "concept": "http-async-operation",
+                        "evidenceType": "route",
+                        "httpMethod": "GET",
+                        "path": "/jobs/{id}",
+                        "responseCodes": [200],
+                        "file": "openapi.yaml",
+                        "lineStart": 1,
+                        "lineEnd": 1,
+                        "confidence": 0.9,
+                        "extractedValue": {},
+                        "extractor": "openapi",
+                    },
+                    {
+                        "repository": "example/ops",
+                        "commit": "abc123",
+                        "concept": "http-cancellation",
+                        "evidenceType": "route",
+                        "httpMethod": "DELETE",
+                        "path": "/jobs/{id}",
+                        "responseCodes": [202],
+                        "file": "openapi.yaml",
+                        "lineStart": 2,
+                        "lineEnd": 2,
+                        "symbol": "cancelJob",
+                        "confidence": 0.8,
+                        "extractedValue": {},
+                        "extractor": "openapi",
+                    },
+                    {
+                        "repository": "example/ops",
+                        "commit": "abc123",
+                        "concept": "http-cancellation",
+                        "evidenceType": "route",
+                        "httpMethod": "DELETE",
+                        "path": "/jobs/{id}",
+                        "responseCodes": [202],
+                        "file": "routes.py",
+                        "lineStart": 3,
+                        "lineEnd": 3,
+                        "symbol": "",
+                        "confidence": 0.6,
+                        "extractedValue": {},
+                        "extractor": "source-routes",
+                    },
+                ],
+            )
+            normalize_evidence(paths=paths)
+            dedupe_repositories(paths=paths)
+
+            output, count = write_cancellation_cell_route_sample(paths=paths, profile="minimum", seed=1)
+            with output.open("r", encoding="utf-8", newline="") as handle:
+                rows = list(csv.DictReader(handle))
+
+            self.assertEqual(count, 1)
+            self.assertEqual(rows[0]["pattern"], "delete-action-cancel")
+            self.assertEqual(len({row["route_id"] for row in rows}), 1)
+            self.assertEqual({row["pattern"] for row in rows}, {"delete-action-cancel"})
 
     def test_cancellation_family_sample_uses_unique_families(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
