@@ -27,7 +27,7 @@ FULL_SAMPLE_SIZES = {
     "put-action-cancel": 27,
     "get-cancel-link": 18,
     "patch-state-cancelled": 5,
-    "delete-operation-resource": 100,
+    "delete-operation-resource": 124,
 }
 
 FULL_ROUTE_SAMPLE_SIZES: dict[str, int | None] = {
@@ -86,9 +86,10 @@ DELETE_OPERATION_RESOURCE_BUCKET_ORDER = (
     "delete-unlinked",
 )
 FULL_DELETE_OPERATION_RESOURCE_BUCKET_SIZES = {
-    "delete-only-linked": 70,
-    "delete-and-strict-different-resource": 15,
+    "delete-only-linked": 55,
+    "delete-and-strict-different-resource": 30,
     "delete-and-strict-same-resource": 15,
+    "delete-unlinked": 24,
 }
 MINIMUM_DELETE_OPERATION_RESOURCE_BUCKET_SIZES = {
     "delete-only-linked": 7,
@@ -503,10 +504,13 @@ def write_blind_labeling_views(
         fieldnames = list(reader.fieldnames or [])
 
     unanchored_unit_column = "cell_sample_id" if any(row.get("cell_sample_id") for row in rows) else "sample_id"
-    label_ids = sorted({row[unanchored_unit_column] for row in rows if row.get(unanchored_unit_column)})
-    rng = random.Random(f"{seed}:unanchored-subset:{source.name}")
-    rng.shuffle(label_ids)
-    unanchored_ids = set(label_ids[: min(unanchored_size, len(label_ids))])
+    unanchored_ids = select_unanchored_unit_ids(
+        rows=rows,
+        unit_column=unanchored_unit_column,
+        seed=seed,
+        source_name=source.name,
+        target_size=unanchored_size,
+    )
 
     labeling_columns = [
         column
@@ -555,6 +559,101 @@ def write_blind_labeling_views(
     write_csv(labeling_target, labeling_rows, columns=labeling_columns)
     write_csv(machine_target, machine_rows, columns=machine_columns)
     return labeling_target, machine_target, len(rows)
+
+
+def select_unanchored_unit_ids(
+    *,
+    rows: list[dict[str, str]],
+    unit_column: str,
+    seed: int,
+    source_name: str,
+    target_size: int,
+) -> set[str]:
+    unit_representatives: dict[str, dict[str, str]] = {}
+    for row in rows:
+        unit_id = row.get(unit_column, "")
+        if unit_id and unit_id not in unit_representatives:
+            unit_representatives[unit_id] = row
+
+    target_count = min(target_size, len(unit_representatives))
+    if target_count <= 0:
+        return set()
+
+    units_by_stratum: dict[str, list[str]] = defaultdict(list)
+    for unit_id, row in unit_representatives.items():
+        units_by_stratum[unanchored_sampling_stratum(row)].append(unit_id)
+
+    quotas = proportional_minimum_one_quotas(
+        {stratum: len(unit_ids) for stratum, unit_ids in units_by_stratum.items()},
+        target_count,
+    )
+    selected: set[str] = set()
+    for stratum, unit_ids in sorted(units_by_stratum.items()):
+        candidates = sorted(unit_ids)
+        rng = random.Random(f"{seed}:unanchored-subset:{source_name}:{stratum}")
+        rng.shuffle(candidates)
+        selected.update(candidates[: quotas.get(stratum, 0)])
+    return selected
+
+
+def unanchored_sampling_stratum(row: dict[str, str]) -> str:
+    pattern = row.get("pattern") or "unknown"
+    if pattern == "delete-operation-resource":
+        bucket = row.get("deleteOperationResourceBucket") or "unknown"
+        return f"{pattern}:{bucket}"
+    return pattern
+
+
+def proportional_minimum_one_quotas(
+    population_counts: dict[str, int],
+    target_size: int,
+) -> dict[str, int]:
+    strata = sorted(stratum for stratum, count in population_counts.items() if count > 0)
+    population_total = sum(population_counts[stratum] for stratum in strata)
+    target_count = min(target_size, population_total)
+    quotas = {stratum: 0 for stratum in strata}
+    if target_count <= 0:
+        return quotas
+
+    if target_count >= len(strata):
+        quotas = {stratum: 1 for stratum in strata}
+        remaining = target_count - len(strata)
+        capacities = {
+            stratum: population_counts[stratum] - 1
+            for stratum in strata
+        }
+    else:
+        remaining = target_count
+        capacities = {stratum: population_counts[stratum] for stratum in strata}
+
+    capacity_total = sum(capacities.values())
+    if remaining <= 0 or capacity_total <= 0:
+        return quotas
+
+    remainders: list[tuple[float, str]] = []
+    assigned = 0
+    for stratum in strata:
+        exact = remaining * capacities[stratum] / capacity_total
+        floor = min(capacities[stratum], int(exact))
+        quotas[stratum] += floor
+        assigned += floor
+        remainders.append((exact - floor, stratum))
+
+    slots = remaining - assigned
+    while slots > 0:
+        progressed = False
+        for _, stratum in sorted(remainders, key=lambda item: (-item[0], item[1])):
+            if quotas[stratum] >= population_counts[stratum]:
+                continue
+            quotas[stratum] += 1
+            slots -= 1
+            progressed = True
+            if slots == 0:
+                break
+        if not progressed:
+            break
+
+    return quotas
 
 
 def label_taxonomy(row: dict[str, str]) -> str:
@@ -1511,6 +1610,11 @@ def sample_summary(rows: list[dict[str, str]], *, seed: int, paths: DataPaths) -
     by_bucket = Counter(row["linkageBucket"] for row in rows)
     by_population = Counter(row["estimationPopulation"] for row in rows)
     by_source_kind = Counter(row["sourceKind"] for row in rows)
+    by_delete_operation_resource_bucket = Counter(
+        row["deleteOperationResourceBucket"]
+        for row in rows
+        if row["pattern"] == "delete-operation-resource"
+    )
     by_source_kind_pattern: dict[str, dict[str, int]] = defaultdict(dict)
     for (source_kind, pattern), count in sorted(
         Counter((row["sourceKind"], row["pattern"]) for row in rows).items()
@@ -1530,6 +1634,7 @@ def sample_summary(rows: list[dict[str, str]], *, seed: int, paths: DataPaths) -
         "sampleCount": len(rows),
         "byPattern": dict(sorted(by_pattern.items())),
         "byLinkageBucket": dict(sorted(by_bucket.items())),
+        "byDeleteOperationResourceBucket": dict(sorted(by_delete_operation_resource_bucket.items())),
         "byEstimationPopulation": dict(sorted(by_population.items())),
         "bySourceKind": dict(sorted(by_source_kind.items())),
         "bySourceKindByPattern": {
@@ -1556,6 +1661,7 @@ def sample_summary(rows: list[dict[str, str]], *, seed: int, paths: DataPaths) -
             ),
             "cellRouteSeedNamespace": "{seed}:cell-route:{pattern}:{family_id}",
             "familyQueueSeedNamespace": "{seed}:{pattern}:{bucket}",
+            "deleteOperationResourceBucketSeedNamespace": "{seed}:delete-operation-resource:{bucket}",
             "routeId": "sha256(repository, httpMethod, normalizedPath-or-path)",
             "evidenceId": "sha256(route_id, commit, pattern, sourceKind, path, file, lineStart, symbol)",
         },
@@ -1573,17 +1679,18 @@ def sample_summary(rows: list[dict[str, str]], *, seed: int, paths: DataPaths) -
                 "more complex."
             ),
             "deleteOperationResource": (
-                "Report separately as an audit stratum for possible strict-rule promotion; "
-                "do not mix it into strict-cancellation estimates."
+                "Report with the DELETE audit taxonomy by bucket, including linked and "
+                "unlinked cells. Map cancellation labels into operation cancellation only "
+                "after adjudication."
             ),
             "ambiguous": (
                 "Report ambiguous-as-false-positive and ambiguous-as-true-positive bounds, "
                 "plus an explicit non-ambiguous rate."
             ),
             "confidenceIntervals": (
-                "Use Clopper-Pearson intervals as the primary interval for sampled strata, "
-                "add finite-population corrected Wilson intervals as a secondary sensitivity "
-                "view where applicable, and mark full-census strata separately."
+                "Do not use pooled Clopper-Pearson, Wilson, or Wald intervals over route rows. "
+                "Use a stratified cluster bootstrap over selected family-pattern cells, with "
+                "zero cell-selection variance for full-census strata."
             ),
         },
     }
@@ -1684,6 +1791,11 @@ def cell_route_sample_summary(rows: list[dict[str, str]], *, seed: int, paths: D
     by_pattern = Counter(row["pattern"] for row in rows)
     by_cell = Counter(row["cell_sample_id"] for row in rows)
     by_source_kind = Counter(row["sourceKind"] for row in rows)
+    by_delete_operation_resource_bucket = Counter(
+        row["deleteOperationResourceBucket"]
+        for row in rows
+        if row["pattern"] == "delete-operation-resource"
+    )
     cell_sizes = list(by_cell.values())
     return {
         "samplingUnit": "family-pattern-cell-route",
@@ -1691,6 +1803,7 @@ def cell_route_sample_summary(rows: list[dict[str, str]], *, seed: int, paths: D
         "sampleCount": len(rows),
         "sampledCells": len(by_cell),
         "byPattern": dict(sorted(by_pattern.items())),
+        "byDeleteOperationResourceBucket": dict(sorted(by_delete_operation_resource_bucket.items())),
         "bySourceKind": dict(sorted(by_source_kind.items())),
         "cellRouteCounts": {
             "distribution": {

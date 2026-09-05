@@ -667,6 +667,104 @@ class PipelineTests(unittest.TestCase):
             }
             self.assertEqual(len(unanchored_cell_ids), 1)
 
+    def test_blind_labeling_unanchored_subset_is_stratified_by_cell(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            input_path = Path(temporary) / "cell-routes.csv"
+            fieldnames = [
+                "sample_id",
+                "cell_sample_id",
+                "cellRouteOrdinal",
+                "route_id",
+                "evidence_id",
+                "repository",
+                "commit",
+                "httpMethod",
+                "normalizedPath",
+                "path",
+                "sourceKind",
+                "file",
+                "lineStart",
+                "symbol",
+                "responseCodes",
+                "responseSemanticsEvidence",
+                "pattern",
+                "deleteOperationResourceBucket",
+                "routeLevelOperationLinked",
+                "operationTarget",
+                "domainTransitionRisk",
+                "confidence",
+                "cancelTargetPath",
+            ]
+            strata = [
+                ("post-subresource-cancel", ""),
+                ("post-action-cancel", ""),
+                ("delete-operation-resource", "delete-only-linked"),
+                ("delete-operation-resource", "delete-unlinked"),
+            ]
+            rows: list[dict[str, str]] = []
+            for stratum_index, (pattern, delete_bucket) in enumerate(strata):
+                for item_index in range(3):
+                    cell_id = f"cell-{stratum_index}-{item_index}"
+                    rows.append(
+                        {
+                            "sample_id": cell_id,
+                            "cell_sample_id": cell_id,
+                            "cellRouteOrdinal": "1",
+                            "route_id": f"route-{stratum_index}-{item_index}",
+                            "evidence_id": f"evidence-{stratum_index}-{item_index}",
+                            "repository": "example/api",
+                            "commit": "abc123",
+                            "httpMethod": "POST",
+                            "normalizedPath": f"/items/{stratum_index}/{item_index}",
+                            "path": f"/items/{stratum_index}/{item_index}",
+                            "sourceKind": "source",
+                            "file": "routes.py",
+                            "lineStart": "1",
+                            "symbol": "",
+                            "responseCodes": "202",
+                            "responseSemanticsEvidence": "",
+                            "pattern": pattern,
+                            "deleteOperationResourceBucket": delete_bucket,
+                            "routeLevelOperationLinked": "false",
+                            "operationTarget": "false",
+                            "domainTransitionRisk": "false",
+                            "confidence": "0.90",
+                            "cancelTargetPath": "",
+                        }
+                    )
+            with input_path.open("w", encoding="utf-8", newline="") as handle:
+                writer = csv.DictWriter(handle, fieldnames=fieldnames, lineterminator="\n")
+                writer.writeheader()
+                writer.writerows(rows)
+
+            labeling_output, machine_output, _ = write_blind_labeling_views(
+                input_path=input_path,
+                labeling_output_path=Path(temporary) / "labeling.csv",
+                machine_output_path=Path(temporary) / "machine.csv",
+                seed=1,
+                unanchored_size=4,
+            )
+            with labeling_output.open("r", encoding="utf-8", newline="") as handle:
+                labeling_rows = list(csv.DictReader(handle))
+            with machine_output.open("r", encoding="utf-8", newline="") as handle:
+                machine_rows = list(csv.DictReader(handle))
+
+            machine_by_evidence = {row["evidence_id"]: row for row in machine_rows}
+            selected_rows = [
+                machine_by_evidence[row["evidence_id"]]
+                for row in labeling_rows
+                if row["unanchored_subset"] == "true"
+            ]
+            selected_strata = {
+                (
+                    row["pattern"],
+                    row["deleteOperationResourceBucket"] if row["pattern"] == "delete-operation-resource" else "",
+                )
+                for row in selected_rows
+            }
+            self.assertEqual(len({row["cell_sample_id"] for row in selected_rows}), 4)
+            self.assertEqual(selected_strata, set(strata))
+
     def test_cancellation_representative_route_is_seeded_not_outcome_sorted(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             paths = data_paths(temporary)
