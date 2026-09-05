@@ -86,6 +86,7 @@ def extract_openapi_json(repo: dict[str, Any], root: Path, path: Path) -> list[d
                         extracted_value={
                             "operationId": operation.get("operationId"),
                             "summary": operation.get("summary"),
+                            "description": operation.get("description"),
                             "responses": sorted(response_codes),
                             "classificationReason": concept["reason"],
                         },
@@ -135,6 +136,7 @@ def extract_openapi_yaml(repo: dict[str, Any], root: Path, path: Path) -> list[d
                     extracted_value={
                         "operationId": operation.get("operationId"),
                         "summary": operation.get("summary"),
+                        "description": operation.get("description"),
                         "responses": codes,
                         "classificationReason": concept["reason"],
                     },

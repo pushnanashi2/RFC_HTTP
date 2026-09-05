@@ -38,6 +38,7 @@ from rfc_miner.sampling import (
     write_blind_labeling_views,
     write_cancellation_cell_route_sample,
     write_cancellation_family_sample,
+    write_cancellation_pilot_sample,
     write_cancellation_route_sample,
     write_cancellation_sample,
 )
@@ -222,6 +223,36 @@ class PipelineTests(unittest.TestCase):
                 locked.chmod(0o700)
             self.assertIsInstance(source_evidence, list)
             self.assertIsInstance(openapi_evidence, list)
+
+    def test_openapi_extractor_preserves_operation_summary_and_description(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            (root / "openapi.json").write_text(
+                json.dumps(
+                    {
+                        "openapi": "3.1.0",
+                        "paths": {
+                            "/jobs/{id}/cancel": {
+                                "post": {
+                                    "operationId": "cancelJob",
+                                    "summary": "Cancel a running job",
+                                    "description": "Requests cancellation while the job is queued or running.",
+                                    "responses": {"202": {"description": "Accepted"}},
+                                }
+                            }
+                        },
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            rows = extract_openapi({"repo_id": "example/api", "commit_hash": "abc123"}, root)
+            cancellation_row = next(row for row in rows if row["concept"] == "http-cancellation")
+            self.assertEqual(cancellation_row["extractedValue"]["summary"], "Cancel a running job")
+            self.assertEqual(
+                cancellation_row["extractedValue"]["description"],
+                "Requests cancellation while the job is queued or running.",
+            )
 
     def test_cancellation_requires_strong_cancel_evidence(self) -> None:
         false_positive = classify_route(
@@ -694,6 +725,182 @@ class PipelineTests(unittest.TestCase):
             self.assertTrue(labeling_summary["workflow"]["unanchoredSubsetRemoved"])
             self.assertEqual(labeling_summary["labelingProvenance"]["labelingTemperature"], 0)
             self.assertIn("DELETE taxonomy label", labeling_summary["workflow"]["agreementDefinition"])
+
+    def test_blind_labeling_view_adds_openapi_operation_context(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            paths = data_paths(temporary)
+            record = {
+                "repository": "example/api",
+                "commit": "abc123",
+                "concept": "http-cancellation",
+                "evidenceType": "openapi_operation",
+                "httpMethod": "POST",
+                "normalizedPath": "/jobs/{var}/cancel",
+                "path": "/jobs/{id}/cancel",
+                "sourceKind": "openapi",
+                "pattern": "post-subresource-cancel",
+                "file": "openapi.json",
+                "lineStart": 10,
+                "symbol": "cancelJob",
+                "responseCodes": [202],
+                "confidence": 0.98,
+                "extractedValue": {
+                    "operationId": "cancelJob",
+                    "summary": "Cancel a running job",
+                    "description": "Requests cancellation while the job is queued or running.",
+                },
+            }
+            write_jsonl(paths.normalized_evidence, [record])
+            route_id = stable_route_id(record)
+            evidence_id = stable_evidence_id(record, route_id=route_id)
+            input_path = Path(temporary) / "cell-routes.csv"
+            with input_path.open("w", encoding="utf-8", newline="") as handle:
+                writer = csv.DictWriter(
+                    handle,
+                    fieldnames=[
+                        "sample_id",
+                        "cell_sample_id",
+                        "cellRouteOrdinal",
+                        "route_id",
+                        "evidence_id",
+                        "repository",
+                        "commit",
+                        "httpMethod",
+                        "normalizedPath",
+                        "path",
+                        "sourceKind",
+                        "file",
+                        "lineStart",
+                        "symbol",
+                        "responseCodes",
+                        "pattern",
+                    ],
+                    lineterminator="\n",
+                )
+                writer.writeheader()
+                writer.writerow(
+                    {
+                        "sample_id": "row-1",
+                        "cell_sample_id": "cell-1",
+                        "cellRouteOrdinal": "1",
+                        "route_id": route_id,
+                        "evidence_id": evidence_id,
+                        "repository": "example/api",
+                        "commit": "abc123",
+                        "httpMethod": "POST",
+                        "normalizedPath": "/jobs/{var}/cancel",
+                        "path": "/jobs/{id}/cancel",
+                        "sourceKind": "openapi",
+                        "file": "openapi.json",
+                        "lineStart": "10",
+                        "symbol": "cancelJob",
+                        "responseCodes": "202",
+                        "pattern": "post-subresource-cancel",
+                    }
+                )
+
+            labeling_output, _, _ = write_blind_labeling_views(
+                input_path=input_path,
+                labeling_output_path=Path(temporary) / "labeling.csv",
+                machine_output_path=Path(temporary) / "machine.csv",
+                paths=paths,
+            )
+            with labeling_output.open("r", encoding="utf-8", newline="") as handle:
+                labeling_rows = list(csv.DictReader(handle))
+            self.assertEqual(labeling_rows[0]["operationSummary"], "Cancel a running job")
+            self.assertEqual(
+                labeling_rows[0]["operationDescription"],
+                "Requests cancellation while the job is queued or running.",
+            )
+
+    def test_cancellation_pilot_sample_uses_blinded_columns(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            labeling_path = Path(temporary) / "labeling.csv"
+            machine_path = Path(temporary) / "machine.csv"
+            labeling_fields = [
+                "sample_id",
+                "httpMethod",
+                "normalizedPath",
+                "path",
+                "responseCodes",
+                "sourceKind",
+                "file",
+                "symbol",
+                "operationSummary",
+                "operationDescription",
+            ]
+            machine_fields = ["sample_id", "evidence_id", "pattern"]
+            with labeling_path.open("w", encoding="utf-8", newline="") as handle:
+                writer = csv.DictWriter(handle, fieldnames=labeling_fields + ["evidence_id"], lineterminator="\n")
+                writer.writeheader()
+                for index in range(25):
+                    method = "DELETE" if index % 2 == 0 else "POST"
+                    for prefix in ("delete", "post"):
+                        writer.writerow(
+                            {
+                                "sample_id": f"{prefix}-{index:03d}",
+                                "evidence_id": f"{prefix}-evidence-{index:03d}",
+                                "httpMethod": method if prefix == "delete" else "POST",
+                                "normalizedPath": f"/jobs/{index}",
+                                "path": f"/jobs/{index}",
+                                "responseCodes": "202",
+                                "sourceKind": "openapi",
+                                "file": "openapi.json",
+                                "symbol": "",
+                                "operationSummary": "Visible summary",
+                                "operationDescription": "",
+                            }
+                        )
+            with machine_path.open("w", encoding="utf-8", newline="") as handle:
+                writer = csv.DictWriter(handle, fieldnames=machine_fields, lineterminator="\n")
+                writer.writeheader()
+                for index in range(25):
+                    writer.writerow(
+                        {
+                            "sample_id": f"delete-{index:03d}",
+                            "evidence_id": f"delete-evidence-{index:03d}",
+                            "pattern": "delete-operation-resource",
+                        }
+                    )
+                    writer.writerow(
+                        {
+                            "sample_id": f"post-{index:03d}",
+                            "evidence_id": f"post-evidence-{index:03d}",
+                            "pattern": "post-subresource-cancel",
+                        }
+                    )
+
+            output_path, count = write_cancellation_pilot_sample(
+                labeling_input_path=labeling_path,
+                machine_input_path=machine_path,
+                output_path=Path(temporary) / "pilot.csv",
+                seed=1,
+            )
+            with output_path.open("r", encoding="utf-8", newline="") as handle:
+                reader = csv.DictReader(handle)
+                pilot_rows = list(reader)
+                pilot_fields = reader.fieldnames or []
+            summary = json.loads(output_path.with_suffix(".summary.json").read_text(encoding="utf-8"))
+
+            self.assertEqual(count, 40)
+            self.assertEqual(len(pilot_rows), 40)
+            self.assertEqual(pilot_fields, [
+                "sample_id",
+                "httpMethod",
+                "normalizedPath",
+                "path",
+                "responseCodes",
+                "sourceKind",
+                "file",
+                "symbol",
+                "operationSummary",
+                "operationDescription",
+            ])
+            self.assertNotIn("pattern", pilot_fields)
+            self.assertEqual(summary["byPattern"], {
+                "delete-operation-resource": 20,
+                "post-subresource-cancel": 20,
+            })
 
     def test_labeling_prompts_are_blind_to_detection_patterns(self) -> None:
         forbidden_patterns = {

@@ -16,6 +16,7 @@ from .sampling import (
     write_blind_labeling_views,
     write_cancellation_cell_route_sample,
     write_cancellation_family_sample,
+    write_cancellation_pilot_sample,
     write_cancellation_route_sample,
     write_cancellation_sample,
 )
@@ -120,6 +121,16 @@ def build_parser() -> argparse.ArgumentParser:
     split_labeling_view.add_argument("--input", required=True)
     split_labeling_view.add_argument("--labeling-output", required=True)
     split_labeling_view.add_argument("--machine-output", required=True)
+
+    cancellation_pilot_sample = subcommands.add_parser(
+        "sample-cancellation-pilot",
+        help="write a blinded pilot labeling sample from the cancellation labeling view",
+    )
+    add_common(cancellation_pilot_sample)
+    cancellation_pilot_sample.add_argument("--labeling-input", required=True)
+    cancellation_pilot_sample.add_argument("--machine-input", required=True)
+    cancellation_pilot_sample.add_argument("--output", required=True)
+    cancellation_pilot_sample.add_argument("--seed", type=int, default=2026090501)
 
     run = subcommands.add_parser("run", help="run the full pipeline")
     add_common(run)
@@ -266,11 +277,22 @@ def main(argv: list[str] | None = None) -> int:
             input_path=args.input,
             labeling_output_path=args.labeling_output,
             machine_output_path=args.machine_output,
+            paths=paths,
         )
         print(
             "cancellation labeling view: "
             f"{labeling_output}; machine metadata: {machine_output}; rows: {count}"
         )
+        return 0
+
+    if args.command == "sample-cancellation-pilot":
+        output, count = write_cancellation_pilot_sample(
+            labeling_input_path=args.labeling_input,
+            machine_input_path=args.machine_input,
+            output_path=args.output,
+            seed=args.seed,
+        )
+        print(f"cancellation pilot sample: {output}; rows: {count}")
         return 0
 
     if args.command == "run":

@@ -21,6 +21,11 @@ from .paths import DataPaths, ensure_data_dirs
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
+PILOT_SAMPLE_SEED = 2026090501
+PILOT_SAMPLE_SIZES = {
+    "delete-operation-resource": 20,
+    "post-subresource-cancel": 20,
+}
 
 FULL_SAMPLE_SIZES = {
     "post-subresource-cancel": 80,
@@ -299,6 +304,8 @@ LABELING_CONTEXT_COLUMNS = [
     "lineStart",
     "symbol",
     "responseCodes",
+    "operationSummary",
+    "operationDescription",
     "responseSemanticsEvidence",
 ]
 
@@ -315,6 +322,19 @@ LABELING_WORKFLOW_COLUMNS = [
     "final_label",
     "adjudicated",
     "adjudicator_rationale",
+]
+
+PILOT_SAMPLE_COLUMNS = [
+    "sample_id",
+    "httpMethod",
+    "normalizedPath",
+    "path",
+    "responseCodes",
+    "sourceKind",
+    "file",
+    "symbol",
+    "operationSummary",
+    "operationDescription",
 ]
 
 BLIND_LABELING_HIDDEN_COLUMNS = {
@@ -484,12 +504,26 @@ def write_blind_labeling_views(
     input_path: str | Path,
     labeling_output_path: str | Path,
     machine_output_path: str | Path,
+    paths: DataPaths | None = None,
 ) -> tuple[Path, Path, int]:
     source = Path(input_path)
     with source.open("r", encoding="utf-8", newline="") as handle:
         reader = csv.DictReader(handle)
         rows = list(reader)
         fieldnames = list(reader.fieldnames or [])
+
+    operation_context_by_evidence_id = (
+        operation_context_by_evidence_id_from_paths(paths)
+        if paths is not None
+        else {}
+    )
+    for row in rows:
+        row.update(
+            operation_context_by_evidence_id.get(
+                row.get("evidence_id", ""),
+                {"operationSummary": "", "operationDescription": ""},
+            )
+        )
 
     labeling_columns = [
         column
@@ -539,6 +573,82 @@ def write_blind_labeling_views(
         ),
     )
     return labeling_target, machine_target, len(rows)
+
+
+def operation_context_by_evidence_id_from_paths(paths: DataPaths) -> dict[str, dict[str, str]]:
+    return operation_context_by_evidence_id(read_jsonl(paths.normalized_evidence))
+
+
+def operation_context_by_evidence_id(evidence: list[dict[str, Any]]) -> dict[str, dict[str, str]]:
+    context: dict[str, dict[str, str]] = {}
+    for record in evidence:
+        extracted_value = record.get("extractedValue")
+        if not isinstance(extracted_value, dict):
+            continue
+        route_id = stable_route_id(record)
+        evidence_id = stable_evidence_id(record, route_id=route_id)
+        context[evidence_id] = {
+            "operationSummary": operation_context_value(extracted_value.get("summary")),
+            "operationDescription": operation_context_value(extracted_value.get("description")),
+        }
+    return context
+
+
+def operation_context_value(value: Any) -> str:
+    return value if isinstance(value, str) else ""
+
+
+def write_cancellation_pilot_sample(
+    *,
+    labeling_input_path: str | Path,
+    machine_input_path: str | Path,
+    output_path: str | Path,
+    seed: int = PILOT_SAMPLE_SEED,
+) -> tuple[Path, int]:
+    with Path(labeling_input_path).open("r", encoding="utf-8", newline="") as handle:
+        labeling_rows = list(csv.DictReader(handle))
+    with Path(machine_input_path).open("r", encoding="utf-8", newline="") as handle:
+        machine_rows = list(csv.DictReader(handle))
+
+    machine_by_evidence_id = {row["evidence_id"]: row for row in machine_rows}
+    labeling_by_pattern: dict[str, list[dict[str, str]]] = defaultdict(list)
+    for row in labeling_rows:
+        machine_row = machine_by_evidence_id.get(row.get("evidence_id", ""))
+        if machine_row is None:
+            continue
+        pattern = machine_row.get("pattern", "")
+        if pattern in PILOT_SAMPLE_SIZES:
+            labeling_by_pattern[pattern].append(row)
+
+    selected: list[dict[str, str]] = []
+    selected_by_pattern: dict[str, int] = {}
+    for pattern, target_size in PILOT_SAMPLE_SIZES.items():
+        candidates = sorted(labeling_by_pattern.get(pattern, []), key=lambda row: row["sample_id"])
+        if len(candidates) < target_size:
+            raise ValueError(f"pilot stratum {pattern} has {len(candidates)} rows, need {target_size}")
+        rng = random.Random(f"{seed}:pilot:{pattern}")
+        rng.shuffle(candidates)
+        selected_rows = sorted(candidates[:target_size], key=lambda row: row["sample_id"])
+        selected.extend(selected_rows)
+        selected_by_pattern[pattern] = len(selected_rows)
+
+    target = Path(output_path)
+    write_csv(
+        target,
+        [{column: row.get(column, "") for column in PILOT_SAMPLE_COLUMNS} for row in selected],
+        columns=PILOT_SAMPLE_COLUMNS,
+    )
+    write_json(
+        target.with_suffix(".summary.json"),
+        {
+            "pilotSeed": seed,
+            "pilotRowCount": len(selected),
+            "byPattern": selected_by_pattern,
+            "sampleIds": [row["sample_id"] for row in selected],
+            "excludedFromFinalEstimates": True,
+        },
+    )
+    return target, len(selected)
 
 
 def label_taxonomy(row: dict[str, str]) -> str:
